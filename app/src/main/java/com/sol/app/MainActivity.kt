@@ -1,16 +1,17 @@
-package com.sol.app
+﻿package com.sol.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.sol.app.data.Session
+import com.sol.app.ui.auth.LoginScreen
+import com.sol.app.ui.auth.RegisterScreen
+import com.sol.app.ui.home.HomeScreen
 import com.sol.app.ui.theme.SolTheme
 
 class MainActivity : ComponentActivity() {
@@ -19,29 +20,38 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             SolTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                AppNavigation()
             }
         }
     }
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+fun AppNavigation() {
+    val nav = rememberNavController()
+    val depart = if (Session.estConnecte) "home" else "login"
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SolTheme {
-        Greeting("Android")
+    NavHost(navController = nav, startDestination = depart) {
+        composable("login") {
+            LoginScreen(
+                onConnecte = {
+                    nav.navigate("home") { popUpTo("login") { inclusive = true } }
+                },
+                onAllerInscription = { nav.navigate("register") },
+            )
+        }
+        composable("register") {
+            RegisterScreen(
+                onInscrit = { nav.popBackStack() },
+                onRetour = { nav.popBackStack() },
+            )
+        }
+        composable("home") {
+            HomeScreen(
+                onDeconnexion = {
+                    nav.navigate("login") { popUpTo(0) }
+                },
+            )
+        }
     }
 }
