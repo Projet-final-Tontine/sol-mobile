@@ -1,5 +1,7 @@
 package com.sol.app.ui.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material3.AlertDialog
@@ -30,10 +34,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,20 +51,40 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.sol.app.data.Network
 import com.sol.app.data.Session
 
-/** Page « Mon Profil » : identite, statut KYC, informations, securite, documents. */
+/** Page « Mon Profil » : photo, KYC, informations, securite, documents. */
 @Composable
-fun ProfilScreen(onDeconnexion: () -> Unit) {
+fun ProfilScreen(
+    onDeconnexion: () -> Unit,
+    vm: ProfilViewModel = viewModel(),
+) {
     var confirmerDeconnexion by remember { mutableStateOf(false) }
     var documentOuvert by remember { mutableStateOf<String?>(null) }
-    var messageInfo by remember { mutableStateOf<String?>(null) }
 
-    // Le statut serveur alimente le badge KYC.
+    val contexte = LocalContext.current
+    val choisirPhoto = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            val octets = contexte.contentResolver.openInputStream(it)?.use { flux ->
+                flux.readBytes()
+            }
+            if (octets != null) vm.televerserPhoto(octets)
+        }
+    }
+
     val statut = (Session.statut ?: "EN_ATTENTE").uppercase()
     val estVerifie = statut == "ACTIF"
     val (kycTexte, kycCouleur) = when (statut) {
@@ -67,7 +93,7 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
         else -> "🔴 Non vérifié" to MaterialTheme.colorScheme.error
     }
 
-    val nomComplet = Session.nomComplet ?: "Membre"
+    val nomComplet = vm.nomComplet
     val prenom = nomComplet.substringBefore(" ")
     val nomFamille = nomComplet.substringAfter(" ", "")
 
@@ -87,7 +113,10 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.weight(1f),
             )
-            IconButton(onClick = { messageInfo = "Les paramètres arrivent bientôt. 🚧" }) {
+            if (vm.enTraitement) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+            }
+            IconButton(onClick = { }) {
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = "Paramètres",
@@ -97,6 +126,10 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
         }
 
         Spacer(Modifier.height(12.dp))
+
+        // Messages de succes / erreur
+        vm.message?.let { MessageProfil(it, MaterialTheme.colorScheme.primary) }
+        vm.erreur?.let { MessageProfil(it, MaterialTheme.colorScheme.error) }
 
         // 2. Carte utilisateur
         Card(
@@ -112,19 +145,31 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box {
-                    Box(
-                        modifier = Modifier
-                            .size(88.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primaryContainer),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(44.dp),
-                            tint = MaterialTheme.colorScheme.primary,
+                    val photo = vm.photoUrl
+                    if (photo != null) {
+                        AsyncImage(
+                            model = Network.BASE_URL.trimEnd('/') + photo,
+                            contentDescription = "Photo de profil",
+                            modifier = Modifier
+                                .size(88.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop,
                         )
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(88.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.Person,
+                                contentDescription = null,
+                                modifier = Modifier.size(44.dp),
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
                     }
                     Box(
                         modifier = Modifier
@@ -132,9 +177,7 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
                             .size(30.dp)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary)
-                            .clickable {
-                                messageInfo = "Le changement de photo arrive bientôt. 📷"
-                            },
+                            .clickable { choisirPhoto.launch("image/*") },
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
@@ -166,7 +209,7 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
 
-        // 3. Verification d'identite (KYC) — juste sous la carte utilisateur.
+        // 3. Verification d'identite (KYC)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -175,23 +218,11 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.VerifiedUser,
-                        contentDescription = null,
-                        tint = kycCouleur,
-                    )
+                    Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = kycCouleur)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text(
-                            "Vérification d'identité (KYC)",
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            kycTexte,
-                            fontWeight = FontWeight.Bold,
-                            color = kycCouleur,
-                            fontSize = 14.sp,
-                        )
+                        Text("Vérification d'identité (KYC)", fontWeight = FontWeight.SemiBold)
+                        Text(kycTexte, fontWeight = FontWeight.Bold, color = kycCouleur, fontSize = 14.sp)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -200,24 +231,6 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                if (!estVerifie) {
-                    Spacer(Modifier.height(14.dp))
-                    Button(
-                        onClick = {
-                            messageInfo =
-                                "La vérification d'identité sera disponible prochainement. 🚧"
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                        ),
-                    ) {
-                        Text("Vérifier mon identité", fontWeight = FontWeight.SemiBold)
-                    }
-                }
             }
         }
 
@@ -237,19 +250,12 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
                     )
-                    TextButton(onClick = {
-                        messageInfo = if (estVerifie) {
-                            "Compte vérifié : le nom, le prénom et la date de naissance ne sont plus modifiables."
-                        } else {
-                            "La modification du profil arrive bientôt. 🚧"
-                        }
-                    }) {
+                    TextButton(onClick = { vm.ouvrirDialogueInfos() }) {
                         Text("Modifier", color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                LigneInfo("Nom", nomFamille.ifBlank { "—" }, verrouille = estVerifie)
-                LigneInfo("Prénom", prenom, verrouille = estVerifie)
-                LigneInfo("Date de naissance", "Non renseignée", verrouille = estVerifie)
+                LigneInfo("Nom", nomFamille.ifBlank { "—" })
+                LigneInfo("Prénom", prenom)
                 LigneInfo("Adresse e-mail", Session.email ?: "—")
                 LigneInfo("Téléphone", Session.telephone ?: "—")
             }
@@ -267,7 +273,7 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
             LigneAction(
                 icone = { Icon(Icons.Outlined.Lock, null, tint = MaterialTheme.colorScheme.primary) },
                 titre = "Modifier le mot de passe",
-                onClick = { messageInfo = "Le changement de mot de passe arrive bientôt. 🚧" },
+                onClick = { vm.ouvrirDialogueMotDePasse() },
             )
         }
 
@@ -295,25 +301,6 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
             }
         }
 
-        messageInfo?.let {
-            Spacer(Modifier.height(14.dp))
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
-                ),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    it,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    textAlign = TextAlign.Center,
-                )
-            }
-        }
-
         Spacer(Modifier.height(20.dp))
 
         // 7. Deconnexion
@@ -333,6 +320,24 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
         }
 
         Spacer(Modifier.height(24.dp))
+    }
+
+    if (vm.dialogueInfosOuvert) {
+        DialogueModifierInfos(
+            nomInitial = nomFamille,
+            prenomInitial = prenom,
+            enTraitement = vm.enTraitement,
+            onValider = { n, p, a -> vm.modifierInfos(n, p, a) },
+            onAnnuler = { vm.fermerDialogueInfos() },
+        )
+    }
+
+    if (vm.dialogueMotDePasseOuvert) {
+        DialogueChangerMotDePasse(
+            enTraitement = vm.enTraitement,
+            onValider = { ancien, nouveau -> vm.changerMotDePasse(ancien, nouveau) },
+            onAnnuler = { vm.fermerDialogueMotDePasse() },
+        )
     }
 
     if (confirmerDeconnexion) {
@@ -381,7 +386,147 @@ fun ProfilScreen(onDeconnexion: () -> Unit) {
 }
 
 @Composable
-private fun LigneInfo(label: String, valeur: String, verrouille: Boolean = false) {
+private fun MessageProfil(texte: String, couleur: Color) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = couleur.copy(alpha = 0.1f)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+    ) {
+        Text(
+            texte,
+            color = couleur,
+            modifier = Modifier.padding(12.dp),
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun DialogueModifierInfos(
+    nomInitial: String,
+    prenomInitial: String,
+    enTraitement: Boolean,
+    onValider: (String, String, String) -> Unit,
+    onAnnuler: () -> Unit,
+) {
+    var nom by remember { mutableStateOf(nomInitial) }
+    var prenom by remember { mutableStateOf(prenomInitial) }
+    var adresse by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onAnnuler,
+        shape = RoundedCornerShape(20.dp),
+        title = { Text("Modifier mes informations", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = prenom, onValueChange = { prenom = it },
+                    label = { Text("Prénom") }, singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = nom, onValueChange = { nom = it },
+                    label = { Text("Nom") }, singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = adresse, onValueChange = { adresse = it },
+                    label = { Text("Adresse (facultatif)") }, singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !enTraitement && nom.isNotBlank() && prenom.isNotBlank(),
+                onClick = { onValider(nom, prenom, adresse) },
+            ) { Text("Enregistrer", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onAnnuler) { Text("Annuler") }
+        },
+    )
+}
+
+@Composable
+private fun DialogueChangerMotDePasse(
+    enTraitement: Boolean,
+    onValider: (String, String) -> Unit,
+    onAnnuler: () -> Unit,
+) {
+    var ancien by remember { mutableStateOf("") }
+    var nouveau by remember { mutableStateOf("") }
+    var confirmation by remember { mutableStateOf("") }
+    var visible by remember { mutableStateOf(false) }
+
+    val valide = ancien.isNotBlank() && nouveau.length >= 8 && nouveau == confirmation
+    val transformation =
+        if (visible) VisualTransformation.None else PasswordVisualTransformation()
+
+    AlertDialog(
+        onDismissRequest = onAnnuler,
+        shape = RoundedCornerShape(20.dp),
+        title = { Text("Modifier le mot de passe", fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = ancien, onValueChange = { ancien = it },
+                    label = { Text("Ancien mot de passe") }, singleLine = true,
+                    visualTransformation = transformation,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = nouveau, onValueChange = { nouveau = it },
+                    label = { Text("Nouveau mot de passe") }, singleLine = true,
+                    visualTransformation = transformation,
+                    supportingText = { Text("8 caractères minimum.") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = confirmation, onValueChange = { confirmation = it },
+                    label = { Text("Confirmer le nouveau mot de passe") }, singleLine = true,
+                    visualTransformation = transformation,
+                    isError = confirmation.isNotBlank() && confirmation != nouveau,
+                    trailingIcon = {
+                        IconButton(onClick = { visible = !visible }) {
+                            Icon(
+                                if (visible) Icons.Default.VisibilityOff
+                                else Icons.Default.Visibility,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = valide && !enTraitement,
+                onClick = { onValider(ancien, nouveau) },
+            ) { Text("Modifier", fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onAnnuler) { Text("Annuler") }
+        },
+    )
+}
+
+@Composable
+private fun LigneInfo(label: String, valeur: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -399,15 +544,6 @@ private fun LigneInfo(label: String, valeur: String, verrouille: Boolean = false
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
         )
-        if (verrouille) {
-            Spacer(Modifier.width(6.dp))
-            Icon(
-                Icons.Outlined.Lock,
-                contentDescription = "Non modifiable",
-                modifier = Modifier.size(14.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 

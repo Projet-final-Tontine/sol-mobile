@@ -37,6 +37,13 @@ object Session {
         get() = prefs.getString("statut", null)
         set(value) = prefs.edit().putString("statut", value).apply()
 
+    /** URL relative de la photo de profil (ex : /uploads/xxx.jpg). */
+    var photoUrl: String?
+        get() = prefs.getString("photo_url", null)
+        set(value) = prefs.edit().apply {
+            if (value == null) remove("photo_url") else putString("photo_url", value)
+        }.apply()
+
     val estConnecte: Boolean
         get() = token != null
 

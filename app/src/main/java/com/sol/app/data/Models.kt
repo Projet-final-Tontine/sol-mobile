@@ -103,3 +103,15 @@ data class TourResponse(
     val id: String,
     val statut: String?,
 )
+
+data class ModifierProfilRequest(
+    val nom: String?,
+    val prenom: String?,
+    val adresse: String?,
+    val photoUrl: String?,
+)
+
+data class ChangerMotDePasseRequest(
+    val ancienMotDePasse: String,
+    val nouveauMotDePasse: String,
+)

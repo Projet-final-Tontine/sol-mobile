@@ -52,6 +52,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
 
+    // Affichage des photos (URL -> image)
+    implementation(libs.coil.compose)
+
     // Reseau : appels a l'API backend
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)

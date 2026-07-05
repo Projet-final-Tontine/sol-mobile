@@ -1,10 +1,14 @@
 ﻿package com.sol.app.data
 
+import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 
 /** Points d'acces de l'API backend utilises par l'application mobile. */
@@ -57,4 +61,14 @@ interface ApiService {
         @Path("solId") solId: String,
         @Body body: OuvrirTourRequest,
     ): TourResponse
+
+    @PUT("api/auth/profil")
+    suspend fun modifierProfil(@Body body: ModifierProfilRequest): UtilisateurResponse
+
+    @POST("api/auth/changer-mot-de-passe")
+    suspend fun changerMotDePasse(@Body body: ChangerMotDePasseRequest): Map<String, String>
+
+    @Multipart
+    @POST("api/fichiers/photo")
+    suspend fun televerserPhoto(@Part fichier: MultipartBody.Part): Map<String, String>
 }

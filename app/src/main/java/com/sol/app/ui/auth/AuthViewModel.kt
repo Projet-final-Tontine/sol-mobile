@@ -33,6 +33,7 @@ class AuthViewModel : ViewModel() {
             Session.email = rep.utilisateur.email
             Session.telephone = rep.utilisateur.telephone
             Session.statut = rep.utilisateur.statut
+            Session.photoUrl = rep.utilisateur.photoUrl
             onSucces()
         }
     }
