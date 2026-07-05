@@ -29,6 +29,10 @@ class AuthViewModel : ViewModel() {
             val rep = Network.api.connexion(ConnexionRequest(telephone.trim(), motDePasse))
             Session.token = rep.token
             Session.nomComplet = "${rep.utilisateur.prenom} ${rep.utilisateur.nom}"
+            Session.utilisateurId = rep.utilisateur.id
+            Session.email = rep.utilisateur.email
+            Session.telephone = rep.utilisateur.telephone
+            Session.statut = rep.utilisateur.statut
             onSucces()
         }
     }

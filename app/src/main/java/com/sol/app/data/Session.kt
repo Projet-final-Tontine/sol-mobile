@@ -20,6 +20,23 @@ object Session {
         get() = prefs.getString("nom", null)
         set(value) = prefs.edit().putString("nom", value).apply()
 
+    var utilisateurId: String?
+        get() = prefs.getString("utilisateur_id", null)
+        set(value) = prefs.edit().putString("utilisateur_id", value).apply()
+
+    var email: String?
+        get() = prefs.getString("email", null)
+        set(value) = prefs.edit().putString("email", value).apply()
+
+    var telephone: String?
+        get() = prefs.getString("telephone", null)
+        set(value) = prefs.edit().putString("telephone", value).apply()
+
+    /** Statut du compte cote serveur : EN_ATTENTE, ACTIF ou BLOQUE (sert au badge KYC). */
+    var statut: String?
+        get() = prefs.getString("statut", null)
+        set(value) = prefs.edit().putString("statut", value).apply()
+
     val estConnecte: Boolean
         get() = token != null
 
