@@ -35,6 +35,67 @@ class ProfilViewModel : ViewModel() {
     var dialogueMotDePasseOuvert by mutableStateOf(false)
         private set
 
+    // ----- Profil de confiance (score de fiabilite) -----
+    var scoreFiabilite by mutableStateOf(100)
+        private set
+    var niveauFiabilite by mutableStateOf("Nouveau membre")
+        private set
+    var emojiFiabilite by mutableStateOf("🌱")
+        private set
+    var nbSols by mutableStateOf(0)
+        private set
+    var cotisationsPayees by mutableStateOf(0)
+        private set
+    var cotisationsTotal by mutableStateOf(0)
+        private set
+    var estNouveau by mutableStateOf(true)
+        private set
+
+    /**
+     * Calcule le score de fiabilite du membre a partir de son historique de
+     * cotisations. Un membre qui paie toutes ses cotisations a temps obtient
+     * un score eleve : c'est la preuve de confiance que la Manman sol recherche.
+     */
+    fun chargerFiabilite() {
+        viewModelScope.launch {
+            try {
+                val sols = Network.api.mesSols()
+                val cotisations = Network.api.mesCotisations()
+                nbSols = sols.size
+                cotisationsTotal = cotisations.size
+                cotisationsPayees = cotisations.count {
+                    it.statut.equals("VALIDE", ignoreCase = true)
+                }
+
+                if (cotisationsTotal == 0) {
+                    estNouveau = true
+                    scoreFiabilite = 100
+                    niveauFiabilite = "Nouveau membre"
+                    emojiFiabilite = "🌱"
+                } else {
+                    estNouveau = false
+                    scoreFiabilite = (cotisationsPayees * 100) / cotisationsTotal
+                    when {
+                        scoreFiabilite >= 90 -> {
+                            niveauFiabilite = "Membre exemplaire"; emojiFiabilite = "🌟"
+                        }
+                        scoreFiabilite >= 75 -> {
+                            niveauFiabilite = "Membre fiable"; emojiFiabilite = "✅"
+                        }
+                        scoreFiabilite >= 50 -> {
+                            niveauFiabilite = "En progression"; emojiFiabilite = "📈"
+                        }
+                        else -> {
+                            niveauFiabilite = "À consolider"; emojiFiabilite = "⚠️"
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+                // En cas d'echec reseau, on garde les valeurs par defaut (silencieux).
+            }
+        }
+    }
+
     fun ouvrirDialogueInfos() { dialogueInfosOuvert = true }
     fun fermerDialogueInfos() { dialogueInfosOuvert = false }
     fun ouvrirDialogueMotDePasse() { dialogueMotDePasseOuvert = true }

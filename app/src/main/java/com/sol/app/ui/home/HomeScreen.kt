@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,10 +27,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Receipt
@@ -43,6 +46,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -83,6 +87,7 @@ import com.sol.app.data.MembreSolResponse
 import com.sol.app.data.PaiementResponse
 import com.sol.app.data.Session
 import com.sol.app.data.SolResponse
+import com.sol.app.data.tr
 import com.sol.app.ui.theme.SolViolet
 
 @Composable
@@ -99,10 +104,10 @@ fun HomeScreen(
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 val elements = listOf(
-                    Triple("Accueil", Icons.Default.Home, 0),
-                    Triple("Mes Tontines", Icons.Default.Groups, 1),
-                    Triple("Transferts", Icons.AutoMirrored.Filled.CompareArrows, 2),
-                    Triple("Profil", Icons.Default.Person, 3),
+                    Triple(tr("Accueil", "Akèy"), Icons.Default.Home, 0),
+                    Triple(tr("Mes Tontines", "Sòl mwen yo"), Icons.Default.Groups, 1),
+                    Triple(tr("Transferts", "Transfè"), Icons.AutoMirrored.Filled.CompareArrows, 2),
+                    Triple(tr("Profil", "Pwofil"), Icons.Default.Person, 3),
                 )
                 elements.forEach { (titre, icone, index) ->
                     NavigationBarItem(
@@ -131,7 +136,7 @@ fun HomeScreen(
             if (onglet == 1) {
                 Column(horizontalAlignment = Alignment.End) {
                     ExtendedFloatingActionButton(
-                        text = { Text("Créer un Sol", fontWeight = FontWeight.SemiBold) },
+                        text = { Text(tr("Créer un Sol", "Kreye yon Sòl"), fontWeight = FontWeight.SemiBold) },
                         icon = { Icon(Icons.Default.Add, contentDescription = null) },
                         onClick = { vm.ouvrirDialogueCreer() },
                         containerColor = MaterialTheme.colorScheme.primary,
@@ -140,7 +145,7 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(10.dp))
                     ExtendedFloatingActionButton(
-                        text = { Text("Rejoindre", fontWeight = FontWeight.SemiBold) },
+                        text = { Text(tr("Rejoindre", "Antre"), fontWeight = FontWeight.SemiBold) },
                         icon = { Icon(Icons.Default.Groups, contentDescription = null) },
                         onClick = { vm.ouvrirDialogueRejoindre() },
                         containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -155,10 +160,7 @@ fun HomeScreen(
             when (onglet) {
                 0 -> OngletAccueil(vm, onVoirTontines = { onglet = 1 })
                 1 -> OngletTontines(vm)
-                2 -> OngletAVenir(
-                    titre = "Transferts",
-                    message = "Les transferts entre membres arrivent bientôt. 🚧",
-                )
+                2 -> OngletTransferts(vm)
                 3 -> ProfilScreen(onDeconnexion)
             }
         }
@@ -197,9 +199,21 @@ fun HomeScreen(
         DialoguePayerCotisation(
             cotisation = cotisation,
             nomSol = vm.sols.find { it.id == cotisation.solId }?.nom ?: "Sol",
-            onValider = { ref -> vm.payerCotisation(ref) },
+            solde = vm.solde,
+            onPayer = { vm.payerCotisationDepuisWallet() },
+            onDeposer = {
+                vm.annulerPaiement()
+                vm.montrerBientot(
+                    "Le dépôt sera disponible avec l'intégration de Mon Cash. " +
+                        "Cette fonctionnalité arrive bientôt."
+                )
+            },
             onAnnuler = { vm.annulerPaiement() },
         )
+    }
+
+    if (vm.dialogueBientotOuvert) {
+        DialogueBientot(texte = vm.texteBientot, onFermer = { vm.fermerBientot() })
     }
 
     if (vm.dialogueTourOuvert) {
@@ -210,19 +224,39 @@ fun HomeScreen(
     }
 }
 
-// ---------- Onglet 1 : ACCUEIL (tableau de bord) ----------
-
+/**
+ * Arrière-plan identique à la page de connexion : l'image `welcome_bg` en plein
+ * écran, recouverte d'un voile dégradé violet foncé. Réutilisé sur Mes Tontines,
+ * Portefeuille et Profil pour une identité visuelle cohérente et premium.
+ * Sur ce fond sombre, les titres passent en blanc et les cartes blanches ressortent.
+ */
 @Composable
-private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
+private fun FondLogin(content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Fond decoratif avec vagues violettes.
         Image(
-            painter = painterResource(R.drawable.home_bg),
+            painter = painterResource(R.drawable.welcome_bg),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
         )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xCC3A22A8), Color(0xE6140A38))
+                    )
+                ),
+        )
+        content()
+    }
+}
 
+// ---------- Onglet 1 : ACCUEIL (tableau de bord) ----------
+
+@Composable
+private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
+    FondLogin {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -260,7 +294,7 @@ private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Bonjour,",
+                    tr("Bonjour,", "Bonjou,"),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.85f),
                 )
@@ -292,7 +326,7 @@ private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
-                    "Solde Total d'Épargne",
+                    tr("Solde Total d'Épargne", "Total Ekonomi ou"),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -332,7 +366,7 @@ private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
         Spacer(Modifier.height(24.dp))
 
         // Mes tontines actives
-        EnTeteSection("Mes Tontines Actives", "Voir tout", onVoirTontines)
+        EnTeteSection(tr("Mes Tontines Actives", "Sòl aktif ou yo"), tr("Voir tout", "Wè tout"), onVoirTontines)
         Spacer(Modifier.height(12.dp))
 
         when {
@@ -355,8 +389,22 @@ private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
 
         Spacer(Modifier.height(24.dp))
 
+        // Prochaines echeances : calendrier des cotisations selon la frequence.
+        Text(
+            tr("Prochaines Échéances", "Pwochen Echeyans"),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        Spacer(Modifier.height(12.dp))
+        CarteCalendrier(vm)
+        Spacer(Modifier.height(12.dp))
+        CarteEcheances(vm)
+
+        Spacer(Modifier.height(24.dp))
+
         // Transactions recentes : les cotisations, payables directement.
-        EnTeteSection("Transactions Récentes", "Voir tout") { }
+        EnTeteSection(tr("Transactions Récentes", "Dènye Tranzaksyon"), tr("Voir tout", "Wè tout")) { }
         Spacer(Modifier.height(12.dp))
         if (vm.cotisations.isEmpty()) {
             CarteVide(
@@ -404,15 +452,15 @@ private fun EnTeteSection(titre: String, action: String, onAction: () -> Unit) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Encre sombre fixe : la zone centrale du fond est toujours claire.
+        // Titre blanc : le fond de l'accueil est desormais violet fonce.
         Text(
             titre,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF221A4E),
+            color = Color.White,
         )
         TextButton(onClick = onAction) {
-            Text(action, color = SolViolet)
+            Text(action, color = Color.White.copy(alpha = 0.9f))
         }
     }
 }
@@ -516,10 +564,302 @@ private fun BadgeStatut(statut: String) {
     }
 }
 
+// ---------- Carte des prochaines echeances (calendrier) ----------
+
+private val MOIS_FR = listOf(
+    "janv.", "févr.", "mars", "avr.", "mai", "juin",
+    "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+)
+
+/** Nombre de jours entre aujourd'hui et l'echeance (negatif = en retard). */
+private fun joursAvantEcheance(dateEcheance: String?): Long? {
+    if (dateEcheance.isNullOrBlank()) return null
+    return try {
+        val d = java.time.LocalDate.parse(dateEcheance.take(10))
+        java.time.temporal.ChronoUnit.DAYS.between(java.time.LocalDate.now(), d)
+    } catch (_: Throwable) {
+        null
+    }
+}
+
+private val MOIS_COMPLET_FR = listOf(
+    "janvier", "février", "mars", "avril", "mai", "juin",
+    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+)
+
+/**
+ * Calendrier mensuel : affiche tout le mois et marque d'un point les jours
+ * ou une cotisation est due (dates cles). Le jour courant est mis en evidence.
+ * Fleches pour naviguer d'un mois a l'autre.
+ */
+@Composable
+private fun CarteCalendrier(vm: HomeViewModel) {
+    var moisAffiche by remember { mutableStateOf(java.time.YearMonth.now()) }
+    val aujourdHui = java.time.LocalDate.now()
+
+    val joursCles = vm.cotisations
+        .mapNotNull { c ->
+            try {
+                c.dateEcheance?.take(10)?.let { java.time.LocalDate.parse(it) }
+            } catch (_: Throwable) {
+                null
+            }
+        }
+        .filter { java.time.YearMonth.from(it) == moisAffiche }
+        .map { it.dayOfMonth }
+        .toSet()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // En-tete : mois + navigation
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { moisAffiche = moisAffiche.minusMonths(1) }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowLeft,
+                        contentDescription = "Mois précédent",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    "${MOIS_COMPLET_FR[moisAffiche.monthValue - 1]} ${moisAffiche.year}",
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                IconButton(onClick = { moisAffiche = moisAffiche.plusMonths(1) }) {
+                    Icon(
+                        Icons.Default.KeyboardArrowRight,
+                        contentDescription = "Mois suivant",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            // Jours de la semaine (Dimanche -> Samedi)
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("Di", "Lu", "Ma", "Me", "Je", "Ve", "Sa").forEach { jour ->
+                    Text(
+                        jour,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+
+            // Grille des jours
+            val decalage = moisAffiche.atDay(1).dayOfWeek.value % 7 // Dimanche = 0
+            val nbJours = moisAffiche.lengthOfMonth()
+            val semaines = (decalage + nbJours + 6) / 7
+            for (semaine in 0 until semaines) {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    for (colonne in 0 until 7) {
+                        val numeroCase = semaine * 7 + colonne
+                        val jour = numeroCase - decalage + 1
+                        if (jour in 1..nbJours) {
+                            JourCalendrier(
+                                jour = jour,
+                                estAujourdHui = moisAffiche.atDay(jour) == aujourdHui,
+                                estCle = joursCles.contains(jour),
+                            )
+                        } else {
+                            Box(modifier = Modifier.weight(1f).height(40.dp))
+                        }
+                    }
+                }
+            }
+
+            if (joursCles.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        tr("Jour de cotisation", "Jou kotizasyon"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RowScope.JourCalendrier(jour: Int, estAujourdHui: Boolean, estCle: Boolean) {
+    val couleurTexte = when {
+        estAujourdHui -> Color.White
+        estCle -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .height(40.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(CircleShape)
+                .then(
+                    if (estAujourdHui) Modifier.background(MaterialTheme.colorScheme.primary)
+                    else Modifier
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "$jour",
+                color = couleurTexte,
+                fontWeight = if (estAujourdHui || estCle) FontWeight.Bold else FontWeight.Normal,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+        }
+        if (estCle && !estAujourdHui) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 3.dp)
+                    .size(5.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+        }
+    }
+}
+
+/**
+ * Carte « Prochaines échéances » : rappelle les cotisations a venir, triees par
+ * date, avec un repere visuel (a venir / bientot / en retard). Les dates sont
+ * generees par le backend selon la frequence choisie (hebdomadaire, mensuelle).
+ */
+@Composable
+private fun CarteEcheances(vm: HomeViewModel) {
+    val echeances = vm.cotisations
+        .filter { !it.statut.equals("VALIDE", ignoreCase = true) }
+        .sortedBy { it.dateEcheance ?: "9999-12-31" }
+        .take(4)
+
+    if (echeances.isEmpty()) {
+        CarteVide(
+            icone = Icons.Default.DateRange,
+            message = "Aucune échéance à venir.\nVous êtes à jour ! 🎉",
+        )
+        return
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    ) {
+        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+            echeances.forEachIndexed { index, cotisation ->
+                LigneEcheance(
+                    cotisation = cotisation,
+                    nomSol = vm.sols.find { it.id == cotisation.solId }?.nom ?: "Sol",
+                    frequence = vm.sols.find { it.id == cotisation.solId }?.frequence ?: "",
+                    onPayer = { vm.demanderPaiement(cotisation) },
+                )
+                if (index < echeances.lastIndex) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LigneEcheance(
+    cotisation: CotisationResponse,
+    nomSol: String,
+    frequence: String,
+    onPayer: () -> Unit,
+) {
+    val jours = joursAvantEcheance(cotisation.dateEcheance)
+    val (libelle, couleur) = when {
+        jours == null -> "À planifier" to MaterialTheme.colorScheme.onSurfaceVariant
+        jours < 0 -> "En retard" to MaterialTheme.colorScheme.error
+        jours == 0L -> "Aujourd'hui" to Color(0xFFB8860B)
+        jours <= 7L -> "Dans ${jours} j" to Color(0xFFB8860B)
+        else -> "Dans ${jours} j" to MaterialTheme.colorScheme.primary
+    }
+
+    val dateLocale = try {
+        cotisation.dateEcheance?.take(10)?.let { java.time.LocalDate.parse(it) }
+    } catch (_: Throwable) {
+        null
+    }
+    val jour = dateLocale?.dayOfMonth?.toString() ?: "--"
+    val mois = dateLocale?.let { MOIS_FR[it.monthValue - 1] } ?: ""
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onPayer() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Pastille date (jour + mois court)
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(couleur.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(jour, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = couleur)
+                Text(mois, fontSize = 10.sp, color = couleur)
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(nomSol, fontWeight = FontWeight.SemiBold)
+            Text(
+                "${cotisation.montantAttendu.toLong()} HTG" +
+                    if (frequence.isNotBlank()) " · ${frequence.lowercase()}" else "",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(couleur.copy(alpha = 0.14f))
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+        ) {
+            Text(
+                libelle,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = couleur,
+            )
+        }
+    }
+}
+
 // ---------- Onglet 2 : MES TONTINES ----------
 
 @Composable
 private fun OngletTontines(vm: HomeViewModel) {
+    FondLogin {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -527,14 +867,15 @@ private fun OngletTontines(vm: HomeViewModel) {
     ) {
         Spacer(Modifier.height(16.dp))
         Text(
-            "Mes Tontines",
+            tr("Mes Tontines", "Sòl mwen yo"),
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
+            color = Color.White,
         )
         Text(
-            "${vm.sols.size} tontine(s)",
+            "${vm.sols.size} " + tr("tontine(s)", "sòl"),
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = Color.White.copy(alpha = 0.85f),
         )
         Spacer(Modifier.height(14.dp))
 
@@ -568,6 +909,7 @@ private fun OngletTontines(vm: HomeViewModel) {
                 item { Spacer(Modifier.height(150.dp)) }
             }
         }
+    }
     }
 }
 
@@ -673,33 +1015,232 @@ private fun InfoColonne(label: String, valeur: String) {
     }
 }
 
-// ---------- Onglet 3 : TRANSFERTS (a venir) ----------
+// ---------- Onglet 3 : PORTEFEUILLE (wallet) ----------
 
+/**
+ * Ecran « Portefeuille » : solde disponible, depot in-app (Mon Cash) et
+ * historique complet des mouvements. Les cotisations se paient depuis ce solde.
+ */
 @Composable
-private fun OngletAVenir(titre: String, message: String) {
+private fun OngletTransferts(vm: HomeViewModel) {
+    val aPayer = vm.cotisations.filter { !it.statut.equals("VALIDE", ignoreCase = true) }
+    val transactions = vm.portefeuille?.transactions ?: emptyList()
+
+    FondLogin {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp),
     ) {
-        Icon(
-            Icons.AutoMirrored.Filled.ShowChart,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp),
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
-        )
-        Spacer(Modifier.height(14.dp))
-        Text(titre, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
-            message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            tr("Mon Portefeuille", "Pòtfèy mwen"),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
         )
+        Text(
+            tr(
+                "Déposez, payez vos cotisations, suivez chaque mouvement.",
+                "Depoze, peye kotizasyon ou, swiv chak mouvman.",
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.85f),
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        vm.messageSucces?.let { MessageCarte(it, MaterialTheme.colorScheme.primary) }
+        vm.erreur?.let { MessageCarte(it, MaterialTheme.colorScheme.error) }
+
+        // Carte du solde + bouton deposer
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    tr("Solde disponible", "Balans disponib"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "%,.2f HTG".format(vm.solde),
+                    fontSize = 32.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    BoutonWallet(
+                        texte = tr("Déposer", "Depoze"),
+                        icone = Icons.Default.Add,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            vm.montrerBientot(
+                                "Le dépôt d'argent arrive bientôt, avec l'intégration " +
+                                    "sécurisée de Mon Cash. 💳"
+                            )
+                        },
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    BoutonWallet(
+                        texte = tr("Retirer", "Retire"),
+                        icone = Icons.AutoMirrored.Filled.CompareArrows,
+                        modifier = Modifier.weight(1f),
+                        onClick = {
+                            vm.montrerBientot(
+                                "Le retrait d'argent arrive bientôt, avec l'intégration " +
+                                    "sécurisée de Mon Cash. 💳"
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Cotisations a payer (depuis le solde)
+        Text(
+            tr("Cotisations à payer", "Kotizasyon pou peye") + " (${aPayer.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        Spacer(Modifier.height(12.dp))
+        if (aPayer.isEmpty()) {
+            CarteVide(
+                icone = Icons.Default.Receipt,
+                message = "Aucune cotisation à payer.\nVous êtes à jour ! 🎉",
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                aPayer.forEach { cotisation ->
+                    CarteCotisation(
+                        cotisation = cotisation,
+                        nomSol = vm.sols.find { it.id == cotisation.solId }?.nom ?: "Sol",
+                        onPayer = { vm.demanderPaiement(cotisation) },
+                    )
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Historique des mouvements du portefeuille
+        Text(
+            tr("Historique des transactions", "Istwa tranzaksyon") + " (${transactions.size})",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        Spacer(Modifier.height(12.dp))
+        if (transactions.isEmpty()) {
+            CarteVide(
+                icone = Icons.AutoMirrored.Filled.CompareArrows,
+                message = "Aucun mouvement pour le moment.\nCommencez par un dépôt.",
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                transactions.forEach { t -> CarteTransaction(t) }
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
     }
+    }
+}
+
+/** Ligne d'un mouvement du portefeuille (depot, cotisation, gain). */
+@Composable
+private fun CarteTransaction(t: com.sol.app.data.TransactionPortefeuilleResponse) {
+    val estCredit = t.sens.equals("CREDIT", ignoreCase = true)
+    val couleur = if (estCredit) Color(0xFF1B8A4E) else MaterialTheme.colorScheme.error
+    val signe = if (estCredit) "+" else "−"
+    val titre = when (t.type.uppercase()) {
+        "DEPOT" -> "Dépôt"
+        "COTISATION" -> "Cotisation"
+        "GAIN_MAIN" -> "Gain de la main"
+        "RETRAIT" -> "Retrait"
+        else -> t.type
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(titre, fontWeight = FontWeight.SemiBold)
+                Text(
+                    t.description ?: (t.dateCreation?.take(10) ?: ""),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    "$signe${t.montant.toLong()} HTG",
+                    fontWeight = FontWeight.Bold,
+                    color = couleur,
+                )
+                Text(
+                    "Solde : ${t.soldeApres.toLong()} HTG",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+/** Bouton d'action du portefeuille (Déposer / Retirer). */
+@Composable
+private fun BoutonWallet(
+    texte: String,
+    icone: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.onPrimary,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ),
+    ) {
+        Icon(icone, contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(texte, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Dialogue informatif « fonctionnalité bientôt disponible ». */
+@Composable
+private fun DialogueBientot(texte: String, onFermer: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onFermer,
+        shape = RoundedCornerShape(20.dp),
+        icon = { Text("🚧", fontSize = 28.sp) },
+        title = { Text(tr("Bientôt disponible", "Byento disponib"), fontWeight = FontWeight.Bold) },
+        text = { Text(texte, textAlign = TextAlign.Center) },
+        confirmButton = {
+            TextButton(onClick = onFermer) {
+                Text(tr("J'ai compris", "Mwen konprann"), fontWeight = FontWeight.Bold)
+            }
+        },
+    )
 }
 
 // ---------- Dialogue : creer un Sol (Manman sol) ----------
@@ -998,7 +1539,7 @@ private fun CarteCotisation(
                 )
                 if (estValidee) {
                     Text(
-                        "✓ Payée",
+                        tr("✓ Payée", "✓ Peye"),
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF1B8A4E),
@@ -1010,7 +1551,7 @@ private fun CarteCotisation(
                             horizontal = 8.dp, vertical = 0.dp,
                         ),
                     ) {
-                        Text("Payer", fontWeight = FontWeight.Bold)
+                        Text(tr("Payer", "Peye"), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1018,53 +1559,74 @@ private fun CarteCotisation(
     }
 }
 
-// ---------- Dialogue : payer une cotisation (Mon Cash) ----------
+// ---------- Dialogue : payer une cotisation depuis le portefeuille ----------
 
 @Composable
 private fun DialoguePayerCotisation(
     cotisation: CotisationResponse,
     nomSol: String,
-    onValider: (String) -> Unit,
+    solde: Double,
+    onPayer: () -> Unit,
+    onDeposer: () -> Unit,
     onAnnuler: () -> Unit,
 ) {
-    var reference by remember { mutableStateOf("") }
+    val montant = cotisation.montantAttendu
+    val soldeSuffisant = solde >= montant
+
     AlertDialog(
         onDismissRequest = onAnnuler,
         shape = RoundedCornerShape(20.dp),
-        title = { Text("Payer ma cotisation", fontWeight = FontWeight.Bold) },
+        title = { Text(tr("Payer ma cotisation", "Peye kotizasyon mwen"), fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 Text("Sol : $nomSol")
+                Spacer(Modifier.height(6.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(tr("Montant", "Montan"), modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${montant.toLong()} HTG", fontWeight = FontWeight.Bold)
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(tr("Votre solde", "Balans ou"), modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "${solde.toLong()} HTG",
+                        fontWeight = FontWeight.Bold,
+                        color = if (soldeSuffisant) Color(0xFF1B8A4E)
+                                else MaterialTheme.colorScheme.error,
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
                 Text(
-                    "Montant : ${cotisation.montantAttendu.toLong()} HTG",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    "Effectuez le dépôt via Mon Cash, puis saisissez la référence de la transaction comme justificatif.",
+                    if (soldeSuffisant)
+                        tr(
+                            "Le montant sera prélevé sur votre portefeuille.",
+                            "Y ap wete montan an nan pòtfèy ou.",
+                        )
+                    else
+                        tr(
+                            "Solde insuffisant : déposez d'abord de l'argent sur votre portefeuille.",
+                            "Balans pa ase : depoze lajan nan pòtfèy ou anvan.",
+                        ),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(14.dp))
-                OutlinedTextField(
-                    value = reference,
-                    onValueChange = { reference = it },
-                    label = { Text("Référence Mon Cash") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth(),
+                    color = if (soldeSuffisant) MaterialTheme.colorScheme.onSurfaceVariant
+                            else MaterialTheme.colorScheme.error,
                 )
             }
         },
         confirmButton = {
-            TextButton(
-                enabled = reference.isNotBlank(),
-                onClick = { onValider(reference) },
-            ) { Text("Déclarer le paiement", fontWeight = FontWeight.Bold) }
+            if (soldeSuffisant) {
+                TextButton(onClick = onPayer) {
+                    Text(tr("Payer depuis mon solde", "Peye ak balans mwen"), fontWeight = FontWeight.Bold)
+                }
+            } else {
+                TextButton(onClick = onDeposer) {
+                    Text(tr("Déposer de l'argent", "Depoze lajan"), fontWeight = FontWeight.Bold)
+                }
+            }
         },
         dismissButton = {
-            TextButton(onClick = onAnnuler) { Text("Annuler") }
+            TextButton(onClick = onAnnuler) { Text(tr("Annuler", "Anile")) }
         },
     )
 }

@@ -41,6 +41,12 @@ interface ApiService {
     @GET("api/mes-cotisations")
     suspend fun mesCotisations(): List<CotisationResponse>
 
+    @GET("api/portefeuille")
+    suspend fun portefeuille(): PortefeuilleResponse
+
+    @POST("api/portefeuille/depot")
+    suspend fun deposer(@Body body: DepotRequest): PortefeuilleResponse
+
     @POST("api/cotisations/{cotisationId}/payer")
     suspend fun payerCotisation(
         @Path("cotisationId") cotisationId: String,

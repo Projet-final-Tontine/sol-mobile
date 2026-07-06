@@ -44,6 +44,11 @@ object Session {
             if (value == null) remove("photo_url") else putString("photo_url", value)
         }.apply()
 
+    /** Langue de l'interface : "fr" (Français) ou "ht" (Kreyòl ayisyen). */
+    var langue: String
+        get() = prefs.getString("langue", "fr") ?: "fr"
+        set(value) = prefs.edit().putString("langue", value).apply()
+
     val estConnecte: Boolean
         get() = token != null
 

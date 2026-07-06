@@ -2,6 +2,7 @@ package com.sol.app.ui.home
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
@@ -35,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,6 +47,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,9 +55,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -61,8 +68,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.sol.app.R
+import com.sol.app.data.I18n
 import com.sol.app.data.Network
 import com.sol.app.data.Session
+import com.sol.app.data.tr
 
 /** Page « Mon Profil » : photo, KYC, informations, securite, documents. */
 @Composable
@@ -72,6 +82,9 @@ fun ProfilScreen(
 ) {
     var confirmerDeconnexion by remember { mutableStateOf(false) }
     var documentOuvert by remember { mutableStateOf<String?>(null) }
+    var dialogueLangueOuvert by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { vm.chargerFiabilite() }
 
     val contexte = LocalContext.current
     val choisirPhoto = rememberLauncherForActivityResult(
@@ -88,14 +101,31 @@ fun ProfilScreen(
     val statut = (Session.statut ?: "EN_ATTENTE").uppercase()
     val estVerifie = statut == "ACTIF"
     val (kycTexte, kycCouleur) = when (statut) {
-        "ACTIF" -> "🟢 Vérifié" to Color(0xFF1B8A4E)
-        "EN_ATTENTE" -> "🟡 Vérification en cours" to Color(0xFFB8860B)
-        else -> "🔴 Non vérifié" to MaterialTheme.colorScheme.error
+        "ACTIF" -> tr("🟢 Vérifié", "🟢 Verifye") to Color(0xFF1B8A4E)
+        "EN_ATTENTE" -> tr("🟡 Vérification en cours", "🟡 Verifikasyon ap fèt") to Color(0xFFB8860B)
+        else -> tr("🔴 Non vérifié", "🔴 Poko verifye") to MaterialTheme.colorScheme.error
     }
 
     val nomComplet = vm.nomComplet
     val prenom = nomComplet.substringBefore(" ")
     val nomFamille = nomComplet.substringAfter(" ", "")
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Image(
+            painter = painterResource(R.drawable.welcome_bg),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(Color(0xCC3A22A8), Color(0xE6140A38))
+                    )
+                ),
+        )
 
     Column(
         modifier = Modifier
@@ -108,9 +138,10 @@ fun ProfilScreen(
         // 1. En-tete
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Mon Profil",
+                tr("Mon Profil", "Pwofil mwen"),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
+                color = Color.White,
                 modifier = Modifier.weight(1f),
             )
             if (vm.enTraitement) {
@@ -120,7 +151,7 @@ fun ProfilScreen(
                 Icon(
                     Icons.Default.Settings,
                     contentDescription = "Paramètres",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = Color.White,
                 )
             }
         }
@@ -209,6 +240,11 @@ fun ProfilScreen(
 
         Spacer(Modifier.height(16.dp))
 
+        // 2.5 Profil de confiance (differenciateur)
+        CarteFiabilite(vm)
+
+        Spacer(Modifier.height(16.dp))
+
         // 3. Verification d'identite (KYC)
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -221,13 +257,19 @@ fun ProfilScreen(
                     Icon(Icons.Default.VerifiedUser, contentDescription = null, tint = kycCouleur)
                     Spacer(Modifier.width(10.dp))
                     Column {
-                        Text("Vérification d'identité (KYC)", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            tr("Vérification d'identité (KYC)", "Verifikasyon idantite (KYC)"),
+                            fontWeight = FontWeight.SemiBold,
+                        )
                         Text(kycTexte, fontWeight = FontWeight.Bold, color = kycCouleur, fontSize = 14.sp)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    "La vérification de votre identité est requise pour effectuer des dépôts et des retraits.",
+                    tr(
+                        "La vérification de votre identité est requise pour effectuer des dépôts et des retraits.",
+                        "Ou dwe verifye idantite ou pou fè depo ak retrè.",
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -246,18 +288,18 @@ fun ProfilScreen(
             Column(modifier = Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "Informations personnelles",
+                        tr("Informations personnelles", "Enfòmasyon pèsonèl"),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
                     )
                     TextButton(onClick = { vm.ouvrirDialogueInfos() }) {
-                        Text("Modifier", color = MaterialTheme.colorScheme.primary)
+                        Text(tr("Modifier", "Modifye"), color = MaterialTheme.colorScheme.primary)
                     }
                 }
-                LigneInfo("Nom", nomFamille.ifBlank { "—" })
-                LigneInfo("Prénom", prenom)
-                LigneInfo("Adresse e-mail", Session.email ?: "—")
-                LigneInfo("Téléphone", Session.telephone ?: "—")
+                LigneInfo(tr("Nom", "Non"), nomFamille.ifBlank { "—" })
+                LigneInfo(tr("Prénom", "Premye non"), prenom)
+                LigneInfo(tr("Adresse e-mail", "Adrès imèl"), Session.email ?: "—")
+                LigneInfo(tr("Téléphone", "Telefòn"), Session.telephone ?: "—")
             }
         }
 
@@ -272,8 +314,25 @@ fun ProfilScreen(
         ) {
             LigneAction(
                 icone = { Icon(Icons.Outlined.Lock, null, tint = MaterialTheme.colorScheme.primary) },
-                titre = "Modifier le mot de passe",
+                titre = tr("Modifier le mot de passe", "Chanje modpas"),
                 onClick = { vm.ouvrirDialogueMotDePasse() },
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 5b. Langue de l'application
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            LigneAction(
+                icone = { Icon(Icons.Default.Language, null, tint = MaterialTheme.colorScheme.primary) },
+                titre = tr("Langue", "Lang") + " : " +
+                    if (I18n.langue == "ht") "Kreyòl ayisyen" else "Français",
+                onClick = { dialogueLangueOuvert = true },
             )
         }
 
@@ -289,14 +348,14 @@ fun ProfilScreen(
             Column {
                 LigneAction(
                     icone = { Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary) },
-                    titre = "Conditions d'utilisation",
-                    onClick = { documentOuvert = "Conditions d'utilisation" },
+                    titre = tr("Conditions d'utilisation", "Kondisyon itilizasyon"),
+                    onClick = { documentOuvert = tr("Conditions d'utilisation", "Kondisyon itilizasyon") },
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 18.dp))
                 LigneAction(
                     icone = { Icon(Icons.Outlined.PrivacyTip, null, tint = MaterialTheme.colorScheme.primary) },
-                    titre = "Politique de confidentialité",
-                    onClick = { documentOuvert = "Politique de confidentialité" },
+                    titre = tr("Politique de confidentialité", "Politik konfidansyalite"),
+                    onClick = { documentOuvert = tr("Politique de confidentialité", "Politik konfidansyalite") },
                 )
             }
         }
@@ -316,10 +375,11 @@ fun ProfilScreen(
         ) {
             Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("Se déconnecter", fontWeight = FontWeight.SemiBold)
+            Text(tr("Se déconnecter", "Dekonekte"), fontWeight = FontWeight.SemiBold)
         }
 
         Spacer(Modifier.height(24.dp))
+    }
     }
 
     if (vm.dialogueInfosOuvert) {
@@ -340,12 +400,28 @@ fun ProfilScreen(
         )
     }
 
+    if (dialogueLangueOuvert) {
+        DialogueLangue(
+            langueActuelle = I18n.langue,
+            onChoisir = { code ->
+                I18n.definir(code)
+                dialogueLangueOuvert = false
+            },
+            onFermer = { dialogueLangueOuvert = false },
+        )
+    }
+
     if (confirmerDeconnexion) {
         AlertDialog(
             onDismissRequest = { confirmerDeconnexion = false },
             shape = RoundedCornerShape(20.dp),
-            title = { Text("Se déconnecter ?", fontWeight = FontWeight.Bold) },
-            text = { Text("Vous devrez vous reconnecter pour accéder à vos tontines.") },
+            title = { Text(tr("Se déconnecter ?", "Dekonekte ?"), fontWeight = FontWeight.Bold) },
+            text = {
+                Text(tr(
+                    "Vous devrez vous reconnecter pour accéder à vos tontines.",
+                    "Ou pral bezwen rekonekte pou ou aksede sòl ou yo.",
+                ))
+            },
             confirmButton = {
                 TextButton(onClick = {
                     confirmerDeconnexion = false
@@ -353,14 +429,16 @@ fun ProfilScreen(
                     onDeconnexion()
                 }) {
                     Text(
-                        "Se déconnecter",
+                        tr("Se déconnecter", "Dekonekte"),
                         color = MaterialTheme.colorScheme.error,
                         fontWeight = FontWeight.Bold,
                     )
                 }
             },
             dismissButton = {
-                TextButton(onClick = { confirmerDeconnexion = false }) { Text("Annuler") }
+                TextButton(onClick = { confirmerDeconnexion = false }) {
+                    Text(tr("Annuler", "Anile"))
+                }
             },
         )
     }
@@ -381,6 +459,134 @@ fun ProfilScreen(
             confirmButton = {
                 TextButton(onClick = { documentOuvert = null }) { Text("Fermer") }
             },
+        )
+    }
+}
+
+/**
+ * Carte « Profil de confiance » : le differenciateur de l'application.
+ * Elle transforme l'historique de paiement du membre en un score de fiabilite
+ * lisible d'un coup d'oeil (couleur + emoji + niveau). C'est la « reputation »
+ * numerique qui remplace la confiance orale de la Manman sol traditionnelle.
+ */
+@Composable
+private fun CarteFiabilite(vm: ProfilViewModel) {
+    val score = vm.scoreFiabilite
+    val couleur = when {
+        vm.estNouveau -> Color(0xFF6A4BAF)
+        score >= 90 -> Color(0xFF1B8A4E)
+        score >= 75 -> Color(0xFF2E7D32)
+        score >= 50 -> Color(0xFFB8860B)
+        else -> Color(0xFFC62828)
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🛡️", fontSize = 20.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    tr("Profil de confiance", "Pwofil konfyans"),
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Badge circulaire du score
+                Box(
+                    modifier = Modifier
+                        .size(84.dp)
+                        .clip(CircleShape)
+                        .background(couleur.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            if (vm.estNouveau) "—" else "$score",
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = couleur,
+                        )
+                        Text("/100", fontSize = 11.sp, color = couleur)
+                    }
+                }
+
+                Spacer(Modifier.width(18.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${vm.emojiFiabilite}  ${vm.niveauFiabilite}",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = couleur,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(
+                        progress = { if (vm.estNouveau) 0f else score / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp)),
+                        color = couleur,
+                        trackColor = couleur.copy(alpha = 0.15f),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        if (vm.estNouveau)
+                            "Payez vos premières cotisations pour bâtir votre réputation."
+                        else
+                            "Basé sur votre ponctualité de paiement.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider()
+            Spacer(Modifier.height(16.dp))
+
+            // Sous-statistiques
+            Row(modifier = Modifier.fillMaxWidth()) {
+                StatFiabilite(tr("Sols rejoints", "Sòl ou antre"), "${vm.nbSols}", Modifier.weight(1f))
+                StatFiabilite(tr("Cotisations à jour", "Kotizasyon ajou"), "${vm.cotisationsPayees}", Modifier.weight(1f))
+                StatFiabilite(
+                    tr("Ponctualité", "Pontyalite"),
+                    if (vm.estNouveau) "—" else "$score%",
+                    Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatFiabilite(label: String, valeur: String, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            valeur,
+            fontWeight = FontWeight.Bold,
+            fontSize = 20.sp,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -523,6 +729,58 @@ private fun DialogueChangerMotDePasse(
             TextButton(onClick = onAnnuler) { Text("Annuler") }
         },
     )
+}
+
+@Composable
+private fun DialogueLangue(
+    langueActuelle: String,
+    onChoisir: (String) -> Unit,
+    onFermer: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onFermer,
+        shape = RoundedCornerShape(20.dp),
+        title = { Text(tr("Choisir la langue", "Chwazi lang"), fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OptionLangue("Français", "fr", langueActuelle, onChoisir)
+                OptionLangue("Kreyòl ayisyen", "ht", langueActuelle, onChoisir)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onFermer) { Text(tr("Fermer", "Fèmen")) }
+        },
+    )
+}
+
+@Composable
+private fun OptionLangue(
+    libelle: String,
+    code: String,
+    selection: String,
+    onChoisir: (String) -> Unit,
+) {
+    val estSelectionne = selection == code
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onChoisir(code) }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            libelle,
+            modifier = Modifier.weight(1f),
+            fontWeight = if (estSelectionne) FontWeight.Bold else FontWeight.Normal,
+        )
+        if (estSelectionne) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
 }
 
 @Composable

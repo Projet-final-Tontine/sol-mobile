@@ -115,3 +115,27 @@ data class ChangerMotDePasseRequest(
     val ancienMotDePasse: String,
     val nouveauMotDePasse: String,
 )
+
+// ----- Portefeuille (wallet) -----
+
+data class DepotRequest(
+    val montant: Double,
+    val referenceMonCash: String,
+)
+
+data class TransactionPortefeuilleResponse(
+    val id: String,
+    val type: String,        // DEPOT, COTISATION, GAIN_MAIN, RETRAIT
+    val sens: String,        // CREDIT, DEBIT
+    val montant: Double,
+    val soldeApres: Double,
+    val referenceExterne: String?,
+    val description: String?,
+    val dateCreation: String?,
+)
+
+data class PortefeuilleResponse(
+    val id: String,
+    val solde: Double,
+    val transactions: List<TransactionPortefeuilleResponse>,
+)

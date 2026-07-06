@@ -12,6 +12,7 @@ import com.sol.app.data.Network
 import com.sol.app.data.OuvrirTourRequest
 import com.sol.app.data.PaiementResponse
 import com.sol.app.data.PayerCotisationRequest
+import com.sol.app.data.PortefeuilleResponse
 import com.sol.app.data.RejoindreRequest
 import com.sol.app.data.SolResponse
 import com.sol.app.data.messageErreur
@@ -55,6 +56,20 @@ class HomeViewModel : ViewModel() {
     var dialogueTourOuvert by mutableStateOf(false)
         private set
 
+    // ----- Portefeuille (wallet) -----
+    var portefeuille by mutableStateOf<PortefeuilleResponse?>(null)
+        private set
+
+    // Dialogue « bientot disponible » (depot / retrait a venir via Mon Cash).
+    var dialogueBientotOuvert by mutableStateOf(false)
+        private set
+    var texteBientot by mutableStateOf("")
+        private set
+
+    /** Solde disponible dans le portefeuille de l'utilisateur. */
+    val solde: Double
+        get() = portefeuille?.solde ?: 0.0
+
     /** Total deja verse et valide, tous Sols confondus. */
     val soldeTotal: Double
         get() = cotisations
@@ -69,11 +84,26 @@ class HomeViewModel : ViewModel() {
     fun annulerPaiement() { cotisationAPayer = null }
     fun ouvrirDialogueTour() { dialogueTourOuvert = true }
     fun fermerDialogueTour() { dialogueTourOuvert = false }
+    fun montrerBientot(texte: String) { texteBientot = texte; dialogueBientotOuvert = true }
+    fun fermerBientot() { dialogueBientotOuvert = false }
 
     fun chargerTout() {
         chargerMesSols()
         chargerCotisations()
+        chargerPortefeuille()
     }
+
+    /** Recupere le solde et l'historique du portefeuille. */
+    fun chargerPortefeuille() {
+        viewModelScope.launch {
+            try {
+                portefeuille = Network.api.portefeuille()
+            } catch (_: Throwable) {
+                // Silencieux : le solde restera a zero si l'appel echoue.
+            }
+        }
+    }
+
 
     fun chargerMesSols() {
         erreur = null
@@ -99,23 +129,23 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun payerCotisation(referenceMonCash: String) {
+    /**
+     * Paie la cotisation en cours depuis le solde du portefeuille.
+     * Si le solde est insuffisant, le backend renvoie une erreur invitant a
+     * deposer de l'argent d'abord.
+     */
+    fun payerCotisationDepuisWallet() {
         val cotisation = cotisationAPayer ?: return
-        if (referenceMonCash.isBlank()) {
-            erreur = "La référence Mon Cash est obligatoire."
-            cotisationAPayer = null
-            return
-        }
         erreur = null
         messageSucces = null
         viewModelScope.launch {
             try {
                 Network.api.payerCotisation(
-                    cotisation.id, PayerCotisationRequest(referenceMonCash.trim())
+                    cotisation.id, PayerCotisationRequest("PORTEFEUILLE")
                 )
-                messageSucces =
-                    "Paiement déclaré ! Il sera confirmé après validation par la Manman sol."
+                messageSucces = "Cotisation payée depuis votre solde ! ✅"
                 chargerCotisations()
+                chargerPortefeuille()
             } catch (e: Throwable) {
                 erreur = messageErreur(e)
             } finally {
