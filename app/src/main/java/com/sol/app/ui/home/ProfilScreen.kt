@@ -81,6 +81,7 @@ fun ProfilScreen(
     vm: ProfilViewModel = viewModel(),
 ) {
     var confirmerDeconnexion by remember { mutableStateOf(false) }
+    var confirmerSuppressionPhoto by remember { mutableStateOf(false) }
     var documentOuvert by remember { mutableStateOf<String?>(null) }
     var dialogueLangueOuvert by remember { mutableStateOf(false) }
 
@@ -177,7 +178,7 @@ fun ProfilScreen(
             ) {
                 Box {
                     val photo = vm.photoUrl
-                    if (photo != null) {
+                    if (!photo.isNullOrBlank()) {
                         AsyncImage(
                             model = Network.BASE_URL.trimEnd('/') + photo,
                             contentDescription = "Photo de profil",
@@ -235,6 +236,14 @@ fun ProfilScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (!vm.photoUrl.isNullOrBlank()) {
+                    TextButton(onClick = { confirmerSuppressionPhoto = true }) {
+                        Text(
+                            tr("Supprimer la photo", "Efase foto a"),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
             }
         }
 
@@ -397,6 +406,37 @@ fun ProfilScreen(
             enTraitement = vm.enTraitement,
             onValider = { ancien, nouveau -> vm.changerMotDePasse(ancien, nouveau) },
             onAnnuler = { vm.fermerDialogueMotDePasse() },
+        )
+    }
+
+    if (confirmerSuppressionPhoto) {
+        AlertDialog(
+            onDismissRequest = { confirmerSuppressionPhoto = false },
+            shape = RoundedCornerShape(20.dp),
+            title = { Text(tr("Supprimer la photo ?", "Efase foto a ?"), fontWeight = FontWeight.Bold) },
+            text = {
+                Text(tr(
+                    "Votre photo sera retirée et l'avatar par défaut sera affiché.",
+                    "Y ap retire foto ou epi avatar default la ap parèt.",
+                ))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmerSuppressionPhoto = false
+                    vm.supprimerPhoto()
+                }) {
+                    Text(
+                        tr("Supprimer", "Efase"),
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmerSuppressionPhoto = false }) {
+                    Text(tr("Annuler", "Anile"))
+                }
+            },
         )
     }
 

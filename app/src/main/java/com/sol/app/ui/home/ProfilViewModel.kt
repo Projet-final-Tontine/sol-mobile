@@ -118,6 +118,18 @@ class ProfilViewModel : ViewModel() {
         }
     }
 
+    /** Supprime la photo de profil (retour a l'avatar par defaut). */
+    fun supprimerPhoto() {
+        lancer {
+            val utilisateur = Network.api.modifierProfil(
+                ModifierProfilRequest(nom = null, prenom = null, adresse = null, photoUrl = "")
+            )
+            Session.photoUrl = utilisateur.photoUrl
+            photoUrl = utilisateur.photoUrl
+            message = "Photo supprimée."
+        }
+    }
+
     fun modifierInfos(nom: String, prenom: String, adresse: String) {
         lancer {
             val utilisateur = Network.api.modifierProfil(

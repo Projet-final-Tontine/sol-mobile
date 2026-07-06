@@ -80,11 +80,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.sol.app.R
 import com.sol.app.data.CotisationResponse
 import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.MembreSolResponse
 import com.sol.app.data.PaiementResponse
+import com.sol.app.data.Network
 import com.sol.app.data.Session
 import com.sol.app.data.SolResponse
 import com.sol.app.data.tr
@@ -278,18 +280,30 @@ private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Icons.Default.Person,
-                    contentDescription = null,
-                    tint = SolViolet,
+            val photoAccueil = Session.photoUrl
+            if (!photoAccueil.isNullOrBlank()) {
+                AsyncImage(
+                    model = Network.BASE_URL.trimEnd('/') + photoAccueil,
+                    contentDescription = "Photo de profil",
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape),
+                    contentScale = ContentScale.Crop,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Person,
+                        contentDescription = null,
+                        tint = SolViolet,
+                    )
+                }
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
