@@ -51,6 +51,10 @@ class ProfilViewModel : ViewModel() {
     var estNouveau by mutableStateOf(true)
         private set
 
+    // Medaille de reputation : BRONZE, ARGENT, OR, DIAMANT.
+    var medaille by mutableStateOf("BRONZE")
+        private set
+
     /**
      * Calcule le score de fiabilite du membre a partir de son historique de
      * cotisations. Un membre qui paie toutes ses cotisations a temps obtient
@@ -89,6 +93,14 @@ class ProfilViewModel : ViewModel() {
                             niveauFiabilite = "À consolider"; emojiFiabilite = "⚠️"
                         }
                     }
+                }
+
+                // Medaille de reputation : combine ponctualite, volume et anciennete.
+                medaille = when {
+                    scoreFiabilite >= 95 && cotisationsPayees >= 10 && nbSols >= 2 -> "DIAMANT"
+                    scoreFiabilite >= 85 && cotisationsPayees >= 5 -> "OR"
+                    scoreFiabilite >= 70 && cotisationsPayees >= 2 -> "ARGENT"
+                    else -> "BRONZE"
                 }
             } catch (_: Throwable) {
                 // En cas d'echec reseau, on garde les valeurs par defaut (silencieux).

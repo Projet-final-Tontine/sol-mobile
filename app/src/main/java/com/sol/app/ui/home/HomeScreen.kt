@@ -1,5 +1,6 @@
 package com.sol.app.ui.home
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -53,6 +55,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -85,12 +88,13 @@ import com.sol.app.R
 import com.sol.app.data.CotisationResponse
 import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.MembreSolResponse
-import com.sol.app.data.PaiementResponse
 import com.sol.app.data.Network
 import com.sol.app.data.Session
 import com.sol.app.data.SolResponse
 import com.sol.app.data.tr
 import com.sol.app.ui.theme.SolViolet
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 @Composable
 fun HomeScreen(
@@ -114,7 +118,7 @@ fun HomeScreen(
                 elements.forEach { (titre, icone, index) ->
                     NavigationBarItem(
                         selected = onglet == index,
-                        onClick = { onglet = index },
+                        onClick = { onglet = index; vm.fermerChat(); vm.fermerDetail() },
                         icon = {
                             if (index == 1 && vm.sols.isNotEmpty()) {
                                 BadgedBox(badge = { Badge { Text("${vm.sols.size}") } }) {
@@ -135,7 +139,7 @@ fun HomeScreen(
             }
         },
         floatingActionButton = {
-            if (onglet == 1) {
+            if (onglet == 1 && vm.solDetail == null) {
                 Column(horizontalAlignment = Alignment.End) {
                     ExtendedFloatingActionButton(
                         text = { Text(tr("Créer un Sol", "Kreye yon Sòl"), fontWeight = FontWeight.SemiBold) },
@@ -159,8 +163,25 @@ fun HomeScreen(
         },
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
-            when (onglet) {
-                0 -> OngletAccueil(vm, onVoirTontines = { onglet = 1 })
+            val chat = vm.chatCible
+            val solOuvert = vm.solDetail
+            if (chat != null) {
+                // Ecran de discussion (groupe ou prive).
+                ChatScreen(vm = vm, cible = chat, onFermer = { vm.fermerChat() })
+            } else if (solOuvert != null) {
+                // Ecran plein « Détail du Sol » (remplace l'onglet courant).
+                EcranDetailSol(
+                    vm = vm,
+                    sol = solOuvert,
+                    onFermer = { vm.fermerDetail() },
+                    onVoirCalendrier = { vm.fermerDetail(); onglet = 0 },
+                )
+            } else when (onglet) {
+                0 -> OngletAccueil(
+                    vm,
+                    onVoirTontines = { onglet = 1 },
+                    onVoirActivite = { onglet = 2 },
+                )
                 1 -> OngletTontines(vm)
                 2 -> OngletTransferts(vm)
                 3 -> ProfilScreen(onDeconnexion)
@@ -179,21 +200,6 @@ fun HomeScreen(
         DialogueCreerSol(
             onValider = { vm.creerSol(it) },
             onAnnuler = { vm.fermerDialogueCreer() },
-        )
-    }
-
-    vm.solDetail?.let { sol ->
-        DialogueDetailSol(
-            sol = sol,
-            membres = vm.membresDetail,
-            paiements = vm.paiementsEnAttente,
-            enChargement = vm.chargementMembres,
-            onDemarrer = { vm.demarrerCycle(sol.id) },
-            onOuvrirTour = { vm.ouvrirDialogueTour() },
-            onValiderPaiement = { vm.validerPaiement(it) },
-            onRejeterPaiement = { vm.rejeterPaiement(it) },
-            onQuitter = { vm.quitterSol(sol.id) },
-            onFermer = { vm.fermerDetail() },
         )
     }
 
@@ -216,6 +222,15 @@ fun HomeScreen(
 
     if (vm.dialogueBientotOuvert) {
         DialogueBientot(texte = vm.texteBientot, onFermer = { vm.fermerBientot() })
+    }
+
+    if (vm.choixMembrePriveOuvert) {
+        DialogueChoixMembre(
+            membres = vm.detailComplet?.membres.orEmpty()
+                .filter { it.utilisateurId != Session.utilisateurId },
+            onChoisir = { m -> vm.ouvrirChatPrive(m.utilisateurId, m.nom ?: "Membre") },
+            onAnnuler = { vm.fermerSelecteurPrive() },
+        )
     }
 
     if (vm.dialogueTourOuvert) {
@@ -257,7 +272,11 @@ private fun FondLogin(content: @Composable androidx.compose.foundation.layout.Bo
 // ---------- Onglet 1 : ACCUEIL (tableau de bord) ----------
 
 @Composable
-private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
+private fun OngletAccueil(
+    vm: HomeViewModel,
+    onVoirTontines: () -> Unit,
+    onVoirActivite: () -> Unit,
+) {
     FondLogin {
         Column(
             modifier = Modifier
@@ -368,10 +387,14 @@ private fun OngletAccueil(vm: HomeViewModel, onVoirTontines: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "Détails de l'Activité ›",
+                        tr("Détails de l'Activité ›", "Detay Aktivite ›"),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onVoirActivite() }
+                            .padding(4.dp),
                     )
                 }
             }
@@ -1009,6 +1032,21 @@ private fun CarteSolDetail(sol: SolResponse, onClick: () -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            ) {
+                Text(
+                    tr("Voir le détail", "Wè detay la") + "  ›",
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+            }
         }
     }
 }
@@ -1257,6 +1295,74 @@ private fun DialogueBientot(texte: String, onFermer: () -> Unit) {
     )
 }
 
+/** Choix du membre avec qui démarrer une discussion privée. */
+@Composable
+private fun DialogueChoixMembre(
+    membres: List<com.sol.app.data.MembreInfo>,
+    onChoisir: (com.sol.app.data.MembreInfo) -> Unit,
+    onAnnuler: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onAnnuler,
+        shape = RoundedCornerShape(20.dp),
+        title = { Text(tr("Discuter avec…", "Pale ak…"), fontWeight = FontWeight.Bold) },
+        text = {
+            if (membres.isEmpty()) {
+                Text(tr(
+                    "Aucun autre membre pour l'instant.",
+                    "Poko gen lòt manm.",
+                ))
+            } else {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    membres.forEach { m ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onChoisir(m) }
+                                .padding(vertical = 8.dp, horizontal = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (!m.photoUrl.isNullOrBlank()) {
+                                AsyncImage(
+                                    model = Network.BASE_URL.trimEnd('/') + m.photoUrl,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(38.dp).clip(CircleShape),
+                                    contentScale = ContentScale.Crop,
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.primaryContainer),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    Icon(
+                                        Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                m.nom ?: "Membre",
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text("›", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onAnnuler) { Text(tr("Fermer", "Fèmen")) }
+        },
+    )
+}
+
 // ---------- Dialogue : creer un Sol (Manman sol) ----------
 
 @Composable
@@ -1361,143 +1467,6 @@ private fun DialogueCreerSol(
         },
         dismissButton = {
             TextButton(onClick = onAnnuler) { Text("Annuler") }
-        },
-    )
-}
-
-// ---------- Dialogue : detail d'un Sol (membres, actions) ----------
-
-@Composable
-private fun DialogueDetailSol(
-    sol: SolResponse,
-    membres: List<MembreSolResponse>,
-    paiements: List<PaiementResponse>,
-    enChargement: Boolean,
-    onDemarrer: () -> Unit,
-    onOuvrirTour: () -> Unit,
-    onValiderPaiement: (String) -> Unit,
-    onRejeterPaiement: (String) -> Unit,
-    onQuitter: () -> Unit,
-    onFermer: () -> Unit,
-) {
-    val estMamanSol = sol.mamanSolId == Session.utilisateurId
-
-    AlertDialog(
-        onDismissRequest = onFermer,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Column {
-                Text(sol.nom, fontWeight = FontWeight.Bold)
-                BadgeStatut(sol.statut)
-            }
-        },
-        text = {
-            Column {
-                Text("Cotisation : ${sol.montantCotisation.toLong()} HTG · ${sol.frequence}")
-                Text("Places : ${sol.nombreMaxMembres}")
-                Text(
-                    "Code d'invitation : ${sol.codeInvitation}",
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.height(14.dp))
-                Text("Membres", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(6.dp))
-                when {
-                    enChargement -> CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp), strokeWidth = 2.dp,
-                    )
-                    membres.isEmpty() -> Text(
-                        "Aucun membre pour le moment.",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    else -> Column(
-                        modifier = Modifier.verticalScroll(rememberScrollState()),
-                    ) {
-                        membres.forEach { m ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    "${m.ordrePassage ?: "–"}.",
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.width(28.dp),
-                                )
-                                Text(
-                                    m.nomComplet ?: "Membre",
-                                    modifier = Modifier.weight(1f),
-                                )
-                                Text(
-                                    m.statutMembre,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Section Manman sol : paiements a valider.
-                if (estMamanSol && paiements.isNotEmpty()) {
-                    Spacer(Modifier.height(14.dp))
-                    Text(
-                        "Paiements à valider (${paiements.size})",
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    paiements.forEach { p ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "${(p.montantPaye ?: 0.0).toLong()} HTG",
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Text(
-                                    "Réf : ${p.referenceTransaction ?: "—"}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            TextButton(onClick = { onValiderPaiement(p.id) }) {
-                                Text("✓ Valider", color = Color(0xFF1B8A4E))
-                            }
-                            TextButton(onClick = { onRejeterPaiement(p.id) }) {
-                                Text("✗", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            if (estMamanSol && sol.statut.equals("OUVERT", ignoreCase = true)) {
-                TextButton(onClick = onDemarrer) {
-                    Text("Démarrer le cycle", fontWeight = FontWeight.Bold)
-                }
-            }
-            if (estMamanSol && sol.statut.equals("EN_COURS", ignoreCase = true)) {
-                TextButton(onClick = onOuvrirTour) {
-                    Text("Ouvrir un tour", fontWeight = FontWeight.Bold)
-                }
-            }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onQuitter) {
-                    Text("Quitter le Sol", color = MaterialTheme.colorScheme.error)
-                }
-                TextButton(onClick = onFermer) { Text("Fermer") }
-            }
         },
     )
 }
@@ -1697,14 +1666,23 @@ private fun DialogueRejoindre(
     onAnnuler: () -> Unit,
 ) {
     var code by remember { mutableStateOf("") }
+
+    // Scanner de QR code : le contenu du QR est le code d'invitation.
+    val lanceurScan = rememberLauncherForActivityResult(ScanContract()) { resultat ->
+        resultat.contents?.let { code = it.trim().uppercase() }
+    }
+
     AlertDialog(
         onDismissRequest = onAnnuler,
         shape = RoundedCornerShape(20.dp),
-        title = { Text("Rejoindre un Sol", fontWeight = FontWeight.Bold) },
+        title = { Text(tr("Rejoindre un Sol", "Antre nan yon Sòl"), fontWeight = FontWeight.Bold) },
         text = {
             Column {
                 Text(
-                    "Saisissez le code d'invitation partagé par la Manman Sol.",
+                    tr(
+                        "Saisissez le code d'invitation, ou scannez le QR code du Sol.",
+                        "Ekri kòd envitasyon an, oswa eskane QR kòd Sòl la.",
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1712,20 +1690,54 @@ private fun DialogueRejoindre(
                 OutlinedTextField(
                     value = code,
                     onValueChange = { code = it },
-                    label = { Text("Code d'invitation") },
+                    label = { Text(tr("Code d'invitation", "Kòd envitasyon")) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Spacer(Modifier.height(12.dp))
+                // Separateur "ou"
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        tr("  ou  ", "  oswa  "),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = {
+                        lanceurScan.launch(
+                            ScanOptions()
+                                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                                .setPrompt(
+                                    tr(
+                                        "Placez le QR code du Sol dans le cadre",
+                                        "Mete QR kòd Sòl la nan kad la",
+                                    )
+                                )
+                                .setBeepEnabled(false)
+                                .setOrientationLocked(false)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(tr("Scanner un QR code", "Eskane yon QR kòd"), fontWeight = FontWeight.SemiBold)
+                }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onValider(code) }) {
-                Text("Rejoindre", fontWeight = FontWeight.Bold)
+            TextButton(enabled = code.isNotBlank(), onClick = { onValider(code) }) {
+                Text(tr("Rejoindre", "Antre"), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
-            TextButton(onClick = onAnnuler) { Text("Annuler") }
+            TextButton(onClick = onAnnuler) { Text(tr("Annuler", "Anile")) }
         },
     )
 }

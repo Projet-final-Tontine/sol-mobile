@@ -55,6 +55,11 @@ dependencies {
     // Affichage des photos (URL -> image)
     implementation(libs.coil.compose)
 
+    // Generation du QR code d'invitation (ecran Detail du Sol)
+    implementation("com.google.zxing:core:3.5.3")
+    // Scan de QR code (rejoindre un Sol par camera)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
     // Reseau : appels a l'API backend
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)

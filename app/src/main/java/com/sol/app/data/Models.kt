@@ -139,3 +139,81 @@ data class PortefeuilleResponse(
     val solde: Double,
     val transactions: List<TransactionPortefeuilleResponse>,
 )
+
+// ----- Detail complet d'un Sol -----
+
+data class TourInfo(
+    val id: String,
+    val numero: Int?,
+    val beneficiaireId: String?,
+    val beneficiaireNom: String?,
+    val datePrevue: String?,
+    val statut: String?,
+    val montantPot: Double?,
+)
+
+data class EtatCotisation(
+    val utilisateurId: String,
+    val membreNom: String?,
+    val photoUrl: String?,
+    val ordre: Int?,
+    val montant: Double,
+    val statut: String,       // EN_ATTENTE, VALIDE, REJETE
+    val dateEcheance: String?,
+)
+
+data class MembreInfo(
+    val utilisateurId: String,
+    val nom: String?,
+    val photoUrl: String?,
+    val ordre: Int?,
+    val statutMembre: String?,
+)
+
+data class PositionMembre(
+    val ordre: Int,
+    val total: Int,
+    val datePrevue: String?,
+    val dateEstimee: Boolean,
+)
+
+data class SanteSol(
+    val score: Int,
+    val niveau: String,   // EXCELLENT, MOYEN, RISQUE
+)
+
+data class EvenementJournal(
+    val date: String?,
+    val type: String,     // ADHESION, PAIEMENT, MAIN, TOUR_OUVERT, RETARD
+    val acteurNom: String?,
+    val montant: Double?,
+)
+
+data class SolDetailResponse(
+    val sol: SolResponse,
+    val nombreMembres: Int,
+    val toursJoues: Int,
+    val totalTours: Int,
+    val tourCourant: TourInfo?,
+    val tours: List<TourInfo>,
+    val etatCotisations: List<EtatCotisation>,
+    val membres: List<MembreInfo>,
+    val maPosition: PositionMembre?,
+    val sante: SanteSol?,
+    val journal: List<EvenementJournal>?,
+)
+
+// ----- Messagerie (chat) -----
+
+data class MessageResponse(
+    val id: String,
+    val expediteurId: String,
+    val expediteurNom: String?,
+    val expediteurPhoto: String?,
+    val contenu: String,
+    val dateEnvoi: String?,
+)
+
+data class EnvoyerMessageRequest(
+    val contenu: String,
+)

@@ -32,6 +32,29 @@ interface ApiService {
     @GET("api/sols/{solId}/membres")
     suspend fun membresDuSol(@Path("solId") solId: String): List<MembreSolResponse>
 
+    @GET("api/sols/{solId}/detail")
+    suspend fun detailDuSol(@Path("solId") solId: String): SolDetailResponse
+
+    // ----- Messagerie -----
+
+    @GET("api/sols/{solId}/messages")
+    suspend fun messagesSol(@Path("solId") solId: String): List<MessageResponse>
+
+    @POST("api/sols/{solId}/messages")
+    suspend fun envoyerAuSol(
+        @Path("solId") solId: String,
+        @Body body: EnvoyerMessageRequest,
+    ): MessageResponse
+
+    @GET("api/messages/prive/{autreId}")
+    suspend fun messagesPrives(@Path("autreId") autreId: String): List<MessageResponse>
+
+    @POST("api/messages/prive/{destinataireId}")
+    suspend fun envoyerPrive(
+        @Path("destinataireId") destinataireId: String,
+        @Body body: EnvoyerMessageRequest,
+    ): MessageResponse
+
     @POST("api/sols/{solId}/demarrer")
     suspend fun demarrerCycle(@Path("solId") solId: String): SolResponse
 

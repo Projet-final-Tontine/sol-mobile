@@ -536,6 +536,26 @@ private fun CarteFiabilite(vm: ProfilViewModel) {
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
+                // Medaille de reputation (Bronze -> Diamant)
+                val (medEmoji, medNom, medCouleur) = when (vm.medaille) {
+                    "DIAMANT" -> Triple("💎", tr("Diamant", "Dyaman"), Color(0xFF3B82F6))
+                    "OR" -> Triple("🥇", tr("Or", "Lò"), Color(0xFFD4A017))
+                    "ARGENT" -> Triple("🥈", tr("Argent", "Ajan"), Color(0xFF8E9BAE))
+                    else -> Triple("🥉", tr("Bronze", "Bwonz"), Color(0xFFB0713A))
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(medCouleur.copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        "$medEmoji $medNom",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = medCouleur,
+                    )
+                }
             }
 
             Spacer(Modifier.height(16.dp))

@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sol.app.data.CotisationResponse
 import com.sol.app.data.CreerSolRequest
+import com.sol.app.data.EnvoyerMessageRequest
+import com.sol.app.data.MessageResponse
 import com.sol.app.data.MembreSolResponse
 import com.sol.app.data.Network
 import com.sol.app.data.OuvrirTourRequest
@@ -14,6 +16,7 @@ import com.sol.app.data.PaiementResponse
 import com.sol.app.data.PayerCotisationRequest
 import com.sol.app.data.PortefeuilleResponse
 import com.sol.app.data.RejoindreRequest
+import com.sol.app.data.SolDetailResponse
 import com.sol.app.data.SolResponse
 import com.sol.app.data.messageErreur
 import kotlinx.coroutines.launch
@@ -48,6 +51,19 @@ class HomeViewModel : ViewModel() {
     var solDetail by mutableStateOf<SolResponse?>(null)
         private set
     var membresDetail by mutableStateOf<List<MembreSolResponse>>(emptyList())
+        private set
+    // Detail complet du Sol : progression, tour courant, cotisations, position.
+    var detailComplet by mutableStateOf<SolDetailResponse?>(null)
+        private set
+
+    // ----- Chat (groupe / prive) -----
+    var chatCible by mutableStateOf<ChatCible?>(null)
+        private set
+    var messagesChat by mutableStateOf<List<MessageResponse>>(emptyList())
+        private set
+    var envoiEnCours by mutableStateOf(false)
+        private set
+    var choixMembrePriveOuvert by mutableStateOf(false)
         private set
     var paiementsEnAttente by mutableStateOf<List<PaiementResponse>>(emptyList())
         private set
@@ -158,11 +174,13 @@ class HomeViewModel : ViewModel() {
         solDetail = sol
         membresDetail = emptyList()
         paiementsEnAttente = emptyList()
+        detailComplet = null
         chargementMembres = true
         viewModelScope.launch {
             try {
                 membresDetail = Network.api.membresDuSol(sol.id)
                 paiementsEnAttente = Network.api.paiementsEnAttente(sol.id)
+                detailComplet = Network.api.detailDuSol(sol.id)
             } catch (e: Throwable) {
                 erreur = messageErreur(e)
             } finally {
@@ -171,7 +189,63 @@ class HomeViewModel : ViewModel() {
         }
     }
 
-    fun fermerDetail() { solDetail = null }
+    fun fermerDetail() { solDetail = null; detailComplet = null }
+
+    // ---------- Chat ----------
+
+    fun ouvrirChatGroupe(sol: SolResponse) {
+        messagesChat = emptyList()
+        chatCible = ChatCible(estGroupe = true, solId = sol.id, titre = sol.nom)
+    }
+
+    fun ouvrirSelecteurPrive() { choixMembrePriveOuvert = true }
+    fun fermerSelecteurPrive() { choixMembrePriveOuvert = false }
+
+    fun ouvrirChatPrive(autreId: String, autreNom: String) {
+        choixMembrePriveOuvert = false
+        messagesChat = emptyList()
+        chatCible = ChatCible(estGroupe = false, solId = "", titre = autreNom, autreId = autreId)
+    }
+
+    fun fermerChat() {
+        chatCible = null
+        messagesChat = emptyList()
+    }
+
+    /** Recupere les messages de la discussion courante (appelee en boucle, silencieuse). */
+    suspend fun rafraichirMessages() {
+        val cible = chatCible ?: return
+        try {
+            messagesChat = if (cible.estGroupe) {
+                Network.api.messagesSol(cible.solId)
+            } else {
+                Network.api.messagesPrives(cible.autreId ?: return)
+            }
+        } catch (_: Throwable) {
+            // Silencieux : on ne perturbe pas l'ecran pendant le rafraichissement.
+        }
+    }
+
+    fun envoyerMessage(contenu: String) {
+        val cible = chatCible ?: return
+        if (contenu.isBlank()) return
+        envoiEnCours = true
+        viewModelScope.launch {
+            try {
+                val corps = EnvoyerMessageRequest(contenu.trim())
+                if (cible.estGroupe) {
+                    Network.api.envoyerAuSol(cible.solId, corps)
+                } else {
+                    Network.api.envoyerPrive(cible.autreId ?: return@launch, corps)
+                }
+                rafraichirMessages()
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                envoiEnCours = false
+            }
+        }
+    }
 
     fun validerPaiement(paiementId: String) {
         viewModelScope.launch {
@@ -297,3 +371,15 @@ class HomeViewModel : ViewModel() {
         messageSucces = null
     }
 }
+
+/**
+ * Cible d'une discussion ouverte.
+ * - Groupe : [estGroupe] vrai, [solId] renseigne.
+ * - Prive  : [estGroupe] faux, [autreId] renseigne (l'autre participant).
+ */
+data class ChatCible(
+    val estGroupe: Boolean,
+    val solId: String,
+    val titre: String,
+    val autreId: String? = null,
+)
