@@ -10,6 +10,7 @@ import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.EnvoyerMessageRequest
 import com.sol.app.data.MessageResponse
 import com.sol.app.data.MembreSolResponse
+import com.sol.app.data.MonTourResponse
 import com.sol.app.data.Network
 import com.sol.app.data.OuvrirTourRequest
 import com.sol.app.data.PaiementResponse
@@ -20,6 +21,9 @@ import com.sol.app.data.SolDetailResponse
 import com.sol.app.data.SolResponse
 import com.sol.app.data.messageErreur
 import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /**
  * Ecran d'accueil : Sols, cotisations (solde, paiement Mon Cash),
@@ -30,6 +34,9 @@ class HomeViewModel : ViewModel() {
     var sols by mutableStateOf<List<SolResponse>>(emptyList())
         private set
     var cotisations by mutableStateOf<List<CotisationResponse>>(emptyList())
+        private set
+    // Tours (distributions) de tous mes Sols : alimente le calendrier intelligent.
+    var mesTours by mutableStateOf<List<MonTourResponse>>(emptyList())
         private set
     var enChargement by mutableStateOf(false)
         private set
@@ -103,10 +110,60 @@ class HomeViewModel : ViewModel() {
     fun montrerBientot(texte: String) { texteBientot = texte; dialogueBientotOuvert = true }
     fun fermerBientot() { dialogueBientotOuvert = false }
 
+    // ----- Moyens de paiement (depot / retrait) -----
+
+    // Type de selecteur ouvert : "DEPOT", "RETRAIT" ou null (ferme).
+    var moyensType by mutableStateOf<String?>(null)
+        private set
+    var ficheOuvert by mutableStateOf(false)
+        private set
+    var envoiFicheEnCours by mutableStateOf(false)
+        private set
+
+    fun ouvrirMoyens(type: String) { moyensType = type }
+    fun fermerMoyens() { moyensType = null }
+    fun ouvrirFiche() { moyensType = null; ficheOuvert = true }
+    fun fermerFiche() { ficheOuvert = false }
+
+    /**
+     * Televerse la fiche de paie / le recu d'un depot bancaire. Le fichier est
+     * envoye au serveur ; il reste « en attente de confirmation » par l'administrateur.
+     */
+    fun envoyerFichePaie(octets: ByteArray) {
+        erreur = null
+        messageSucces = null
+        envoiFicheEnCours = true
+        viewModelScope.launch {
+            try {
+                val corps = octets.toRequestBody("image/*".toMediaTypeOrNull())
+                val partie = MultipartBody.Part.createFormData("fichier", "recu.jpg", corps)
+                Network.api.televerserPhoto(partie)
+                messageSucces = "Reçu envoyé ! En attente de confirmation. ✅"
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                envoiFicheEnCours = false
+                ficheOuvert = false
+            }
+        }
+    }
+
     fun chargerTout() {
         chargerMesSols()
         chargerCotisations()
         chargerPortefeuille()
+        chargerMesTours()
+    }
+
+    /** Recupere les tours (distributions) de tous mes Sols pour le calendrier. */
+    fun chargerMesTours() {
+        viewModelScope.launch {
+            try {
+                mesTours = Network.api.mesTours()
+            } catch (_: Throwable) {
+                // Silencieux : le calendrier restera sans couronnes si l'appel echoue.
+            }
+        }
     }
 
     /** Recupere le solde et l'historique du portefeuille. */
@@ -227,23 +284,51 @@ class HomeViewModel : ViewModel() {
     }
 
     fun envoyerMessage(contenu: String) {
-        val cible = chatCible ?: return
         if (contenu.isBlank()) return
         envoiEnCours = true
         viewModelScope.launch {
+            envoyerRequete(EnvoyerMessageRequest(contenu.trim()))
+            envoiEnCours = false
+        }
+    }
+
+    /**
+     * Televerse une piece jointe (image ou document) puis l'envoie comme message.
+     * [type] vaut "IMAGE" ou "DOCUMENT".
+     */
+    fun envoyerPieceJointe(octets: ByteArray, nomFichier: String, type: String) {
+        chatCible ?: return
+        envoiEnCours = true
+        viewModelScope.launch {
             try {
-                val corps = EnvoyerMessageRequest(contenu.trim())
-                if (cible.estGroupe) {
-                    Network.api.envoyerAuSol(cible.solId, corps)
-                } else {
-                    Network.api.envoyerPrive(cible.autreId ?: return@launch, corps)
-                }
-                rafraichirMessages()
+                val mime = if (type == "IMAGE") "image/*" else "application/octet-stream"
+                val corps = octets.toRequestBody(mime.toMediaTypeOrNull())
+                val nom = if (nomFichier.isBlank()) "piece" else nomFichier
+                val partie = MultipartBody.Part.createFormData("fichier", nom, corps)
+                val reponse = Network.api.televerserPhoto(partie)
+                val url = reponse["url"]
+                    ?: throw IllegalStateException("Le serveur n'a pas renvoyé d'URL.")
+                envoyerRequete(EnvoyerMessageRequest("", pieceJointeUrl = url, typePiece = type))
             } catch (e: Throwable) {
                 erreur = messageErreur(e)
             } finally {
                 envoiEnCours = false
             }
+        }
+    }
+
+    /** Envoie une requete de message (groupe ou prive) puis rafraichit la liste. */
+    private suspend fun envoyerRequete(corps: EnvoyerMessageRequest) {
+        val cible = chatCible ?: return
+        try {
+            if (cible.estGroupe) {
+                Network.api.envoyerAuSol(cible.solId, corps)
+            } else {
+                Network.api.envoyerPrive(cible.autreId ?: return, corps)
+            }
+            rafraichirMessages()
+        } catch (e: Throwable) {
+            erreur = messageErreur(e)
         }
     }
 

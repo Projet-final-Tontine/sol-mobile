@@ -66,6 +66,9 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.coroutines.android)
 
+    // Rappels de cotisation en tache de fond (notifications, meme app fermee)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

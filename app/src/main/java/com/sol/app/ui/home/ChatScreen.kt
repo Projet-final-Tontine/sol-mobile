@@ -1,6 +1,12 @@
 package com.sol.app.ui.home
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +28,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +69,33 @@ private fun heure(iso: String?): String = try {
     ""
 }
 
+/** Lit le fichier choisi et l'envoie comme piece jointe (image ou document). */
+private fun envoyerUri(context: Context, uri: Uri, type: String, vm: HomeViewModel) {
+    val octets = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+    vm.envoyerPieceJointe(octets, nomFichier(context, uri), type)
+}
+
+/** Recupere le nom d'affichage d'un fichier a partir de son Uri. */
+private fun nomFichier(context: Context, uri: Uri): String {
+    var nom = "piece"
+    context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+        val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+        if (idx >= 0 && c.moveToFirst()) c.getString(idx)?.let { nom = it }
+    }
+    return nom
+}
+
+/** Ouvre une URL (image ou document) dans l'application adaptee du telephone. */
+private fun ouvrirUrl(context: Context, url: String) {
+    try {
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+    } catch (_: Throwable) {
+        // Aucune application pour ouvrir ce lien : on ignore silencieusement.
+    }
+}
+
 /**
  * Ecran de discussion (chat de groupe d'un Sol ou chat prive).
  * Les messages se rafraichissent automatiquement toutes les 2 secondes tant que
@@ -73,6 +110,17 @@ fun ChatScreen(
     val etatListe = rememberLazyListState()
     var saisie by remember { mutableStateOf("") }
     val messages = vm.messagesChat
+
+    val contexte = LocalContext.current
+    var menuJoindre by remember { mutableStateOf(false) }
+    // Selecteur d'image : envoie la photo choisie comme piece jointe.
+    val choisirImage = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { envoyerUri(contexte, it, "IMAGE", vm) } }
+    // Selecteur de document (tout type de fichier).
+    val choisirDoc = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> uri?.let { envoyerUri(contexte, it, "DOCUMENT", vm) } }
 
     // Rafraichissement automatique toutes les 2 s.
     LaunchedEffect(cible.solId, cible.autreId) {
@@ -185,6 +233,29 @@ fun ChatScreen(
                 .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Bouton pièce jointe : photo ou document.
+            Box {
+                IconButton(
+                    onClick = { menuJoindre = true },
+                    enabled = !vm.envoiEnCours,
+                ) {
+                    Icon(
+                        Icons.Default.AttachFile,
+                        contentDescription = tr("Joindre", "Mete yon pyès"),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                DropdownMenu(expanded = menuJoindre, onDismissRequest = { menuJoindre = false }) {
+                    DropdownMenuItem(
+                        text = { Text(tr("📷  Photo", "📷  Foto")) },
+                        onClick = { menuJoindre = false; choisirImage.launch("image/*") },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(tr("📄  Document", "📄  Dokiman")) },
+                        onClick = { menuJoindre = false; choisirDoc.launch("*/*") },
+                    )
+                }
+            }
             OutlinedTextField(
                 value = saisie,
                 onValueChange = { saisie = it },
@@ -275,6 +346,9 @@ private fun BulleMessage(
                     modifier = Modifier.padding(start = 6.dp, bottom = 2.dp),
                 )
             }
+            val contexte = LocalContext.current
+            val couleurTexte = if (estMoi) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onSurface
             Box(
                 modifier = Modifier
                     .clip(
@@ -291,12 +365,62 @@ private fun BulleMessage(
                     )
                     .padding(horizontal = 12.dp, vertical = 8.dp),
             ) {
-                Text(
-                    message.contenu,
-                    color = if (estMoi) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurface,
-                    fontSize = 15.sp,
-                )
+                Column {
+                    val urlComplet = message.pieceJointeUrl
+                        ?.let { Network.BASE_URL.trimEnd('/') + it }
+                    when (message.typePiece?.uppercase()) {
+                        "IMAGE" -> if (urlComplet != null) {
+                            AsyncImage(
+                                model = urlComplet,
+                                contentDescription = tr("Image jointe", "Foto"),
+                                modifier = Modifier
+                                    .size(width = 200.dp, height = 200.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { ouvrirUrl(contexte, urlComplet) },
+                                contentScale = ContentScale.Crop,
+                            )
+                            if (message.contenu.isNotBlank()) Spacer(Modifier.height(6.dp))
+                        }
+
+                        "DOCUMENT" -> if (urlComplet != null) {
+                            val ext = message.pieceJointeUrl!!.substringAfterLast('.', "").uppercase()
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { ouvrirUrl(contexte, urlComplet) }
+                                    .padding(vertical = 2.dp),
+                            ) {
+                                Text("📄", fontSize = 24.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        tr("Document", "Dokiman") +
+                                            if (ext.isNotBlank()) " ($ext)" else "",
+                                        color = couleurTexte,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp,
+                                        maxLines = 1,
+                                    )
+                                    Text(
+                                        tr("Toucher pour ouvrir", "Peze pou ouvri"),
+                                        color = couleurTexte.copy(alpha = 0.75f),
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                            if (message.contenu.isNotBlank()) Spacer(Modifier.height(6.dp))
+                        }
+                    }
+                    if (message.contenu.isNotBlank()) {
+                        Text(
+                            message.contenu,
+                            color = couleurTexte,
+                            fontSize = 15.sp,
+                        )
+                    }
+                }
             }
             Text(
                 heure(message.dateEnvoi),

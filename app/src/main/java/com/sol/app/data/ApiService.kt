@@ -23,6 +23,9 @@ interface ApiService {
     @GET("api/sols/mes-sols")
     suspend fun mesSols(): List<SolResponse>
 
+    @GET("api/sols/mes-tours")
+    suspend fun mesTours(): List<MonTourResponse>
+
     @POST("api/sols/rejoindre")
     suspend fun rejoindre(@Body body: RejoindreRequest): MembreSolResponse
 

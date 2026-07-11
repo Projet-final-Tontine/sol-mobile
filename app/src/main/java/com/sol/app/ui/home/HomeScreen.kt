@@ -1,6 +1,9 @@
 package com.sol.app.ui.home
 
+import android.Manifest
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -76,10 +79,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -89,6 +94,7 @@ import com.sol.app.data.CotisationResponse
 import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.MembreSolResponse
 import com.sol.app.data.Network
+import com.sol.app.data.Rappels
 import com.sol.app.data.Session
 import com.sol.app.data.SolResponse
 import com.sol.app.data.tr
@@ -103,7 +109,24 @@ fun HomeScreen(
 ) {
     var onglet by rememberSaveable { mutableIntStateOf(0) }
 
-    LaunchedEffect(Unit) { vm.chargerTout() }
+    val contexte = LocalContext.current
+    // Demande la permission de notifications (Android 13+) ; on planifie ensuite.
+    val lanceurNotif = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { accordee ->
+        // Des que la permission est accordee, on verifie tout de suite les echeances.
+        if (accordee) Rappels.verifierMaintenant(contexte)
+    }
+
+    LaunchedEffect(Unit) {
+        vm.chargerTout()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            lanceurNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        // Programme les rappels de fond + verifie tout de suite les echeances.
+        Rappels.planifier(contexte)
+        Rappels.verifierMaintenant(contexte)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -237,6 +260,32 @@ fun HomeScreen(
         DialogueOuvrirTour(
             onValider = { date -> vm.ouvrirTour(date) },
             onAnnuler = { vm.fermerDialogueTour() },
+        )
+    }
+
+    // Selecteur de moyen de paiement (Depot / Retrait).
+    vm.moyensType?.let { type ->
+        DialogueMoyensPaiement(
+            type = type,
+            onBientot = { nom ->
+                vm.fermerMoyens()
+                vm.montrerBientot(
+                    tr(
+                        "« $nom » sera bientôt disponible. Le lien de paiement arrive prochainement. 💳",
+                        "« $nom » ap disponib byento. Lyen pèman an ap vini talè. 💳",
+                    )
+                )
+            },
+            onFiche = { vm.ouvrirFiche() },
+            onFermer = { vm.fermerMoyens() },
+        )
+    }
+
+    if (vm.ficheOuvert) {
+        DialogueFichePaie(
+            enCours = vm.envoiFicheEnCours,
+            onEnvoyer = { octets -> vm.envoyerFichePaie(octets) },
+            onFermer = { vm.fermerFiche() },
         )
     }
 }
@@ -624,27 +673,59 @@ private val MOIS_COMPLET_FR = listOf(
     "juillet", "août", "septembre", "octobre", "novembre", "décembre",
 )
 
+/** Nature d'un jour marque dans le calendrier intelligent. */
+private enum class MarqueurJour { COTISATION, DISTRIBUTION, RETARD }
+
+private val VertCotisation = Color(0xFF35D07F)
+private val RougeRetardCal = Color(0xFFFF5A6E)
+
+/** Convertit une date ISO en LocalDate, ou null si illisible. */
+private fun versDate(iso: String?): java.time.LocalDate? = try {
+    iso?.take(10)?.let { java.time.LocalDate.parse(it) }
+} catch (_: Throwable) {
+    null
+}
+
 /**
- * Calendrier mensuel : affiche tout le mois et marque d'un point les jours
- * ou une cotisation est due (dates cles). Le jour courant est mis en evidence.
- * Fleches pour naviguer d'un mois a l'autre.
+ * Calendrier intelligent : affiche tout le mois et marque chaque jour selon sa
+ * nature — 🟢 jour de cotisation, 🔴 cotisation en retard, 👑 distribution de la
+ * main (un membre recoit). Le jour courant est mis en evidence. Fleches pour
+ * naviguer d'un mois a l'autre.
  */
 @Composable
 private fun CarteCalendrier(vm: HomeViewModel) {
     var moisAffiche by remember { mutableStateOf(java.time.YearMonth.now()) }
     val aujourdHui = java.time.LocalDate.now()
 
-    val joursCles = vm.cotisations
-        .mapNotNull { c ->
-            try {
-                c.dateEcheance?.take(10)?.let { java.time.LocalDate.parse(it) }
-            } catch (_: Throwable) {
-                null
-            }
-        }
+    // Jours de distribution (couronne) : dates des tours de tous mes Sols.
+    val joursDistribution = vm.mesTours
+        .mapNotNull { versDate(it.datePrevue) }
         .filter { java.time.YearMonth.from(it) == moisAffiche }
         .map { it.dayOfMonth }
         .toSet()
+
+    // Jours de retard : cotisation non reglee dont l'echeance est passee.
+    val joursRetard = vm.cotisations
+        .filter { !it.statut.equals("VALIDE", ignoreCase = true) }
+        .mapNotNull { versDate(it.dateEcheance) }
+        .filter { java.time.YearMonth.from(it) == moisAffiche && it.isBefore(aujourdHui) }
+        .map { it.dayOfMonth }
+        .toSet()
+
+    // Jours de cotisation : toute echeance du mois qui n'est pas deja en retard.
+    val joursCotisation = vm.cotisations
+        .mapNotNull { versDate(it.dateEcheance) }
+        .filter { java.time.YearMonth.from(it) == moisAffiche }
+        .map { it.dayOfMonth }
+        .toSet()
+
+    // Un seul marqueur par jour, par ordre de priorite : couronne > retard > cotisation.
+    fun marqueurDe(jour: Int): MarqueurJour? = when {
+        joursDistribution.contains(jour) -> MarqueurJour.DISTRIBUTION
+        joursRetard.contains(jour) -> MarqueurJour.RETARD
+        joursCotisation.contains(jour) -> MarqueurJour.COTISATION
+        else -> null
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -707,7 +788,7 @@ private fun CarteCalendrier(vm: HomeViewModel) {
                             JourCalendrier(
                                 jour = jour,
                                 estAujourdHui = moisAffiche.atDay(jour) == aujourdHui,
-                                estCle = joursCles.contains(jour),
+                                marqueur = marqueurDe(jour),
                             )
                         } else {
                             Box(modifier = Modifier.weight(1f).height(40.dp))
@@ -716,32 +797,64 @@ private fun CarteCalendrier(vm: HomeViewModel) {
                 }
             }
 
-            if (joursCles.isNotEmpty()) {
-                Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        tr("Jour de cotisation", "Jou kotizasyon"),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            // Legende : n'affiche que les reperes reellement presents ce mois-ci.
+            val elementsLegende = buildList {
+                if (joursCotisation.isNotEmpty()) {
+                    add(MarqueurJour.COTISATION to tr("Cotisation", "Kotizasyon"))
+                }
+                if (joursDistribution.isNotEmpty()) {
+                    add(MarqueurJour.DISTRIBUTION to tr("Distribution", "Distribisyon"))
+                }
+                if (joursRetard.isNotEmpty()) {
+                    add(MarqueurJour.RETARD to tr("En retard", "An reta"))
+                }
+            }
+            if (elementsLegende.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    elementsLegende.forEach { (type, libelle) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            when (type) {
+                                MarqueurJour.DISTRIBUTION -> Text("👑", fontSize = 11.sp)
+                                MarqueurJour.RETARD -> PointLegende(RougeRetardCal)
+                                MarqueurJour.COTISATION -> PointLegende(VertCotisation)
+                            }
+                            Spacer(Modifier.width(5.dp))
+                            Text(
+                                libelle,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
             }
         }
     }
 }
 
+/** Petit point colore de la legende du calendrier. */
 @Composable
-private fun RowScope.JourCalendrier(jour: Int, estAujourdHui: Boolean, estCle: Boolean) {
+private fun PointLegende(couleur: Color) {
+    Box(
+        modifier = Modifier
+            .size(7.dp)
+            .clip(CircleShape)
+            .background(couleur),
+    )
+}
+
+@Composable
+private fun RowScope.JourCalendrier(jour: Int, estAujourdHui: Boolean, marqueur: MarqueurJour?) {
     val couleurTexte = when {
         estAujourdHui -> Color.White
-        estCle -> MaterialTheme.colorScheme.primary
+        marqueur == MarqueurJour.RETARD -> RougeRetardCal
+        marqueur == MarqueurJour.COTISATION -> VertCotisation
         else -> MaterialTheme.colorScheme.onSurface
     }
     Box(
@@ -763,21 +876,46 @@ private fun RowScope.JourCalendrier(jour: Int, estAujourdHui: Boolean, estCle: B
             Text(
                 "$jour",
                 color = couleurTexte,
-                fontWeight = if (estAujourdHui || estCle) FontWeight.Bold else FontWeight.Normal,
+                fontWeight = if (estAujourdHui || marqueur != null) FontWeight.Bold else FontWeight.Normal,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
-        if (estCle && !estAujourdHui) {
+        // Repere sous le numero : couronne pour une distribution, point sinon.
+        if (marqueur != null && !estAujourdHui) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 3.dp)
-                    .size(5.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary),
-            )
+                    .padding(bottom = 2.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                when (marqueur) {
+                    MarqueurJour.DISTRIBUTION -> Text("👑", fontSize = 9.sp)
+                    MarqueurJour.RETARD -> PointCalendrier(RougeRetardCal)
+                    MarqueurJour.COTISATION -> PointCalendrier(VertCotisation)
+                }
+            }
+        } else if (marqueur == MarqueurJour.DISTRIBUTION && estAujourdHui) {
+            // Aujourd'hui + distribution : couronne posee en bas du cercle plein.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 2.dp),
+            ) {
+                Text("👑", fontSize = 9.sp)
+            }
         }
     }
+}
+
+/** Point colore sous un jour du calendrier (cotisation ou retard). */
+@Composable
+private fun PointCalendrier(couleur: Color) {
+    Box(
+        modifier = Modifier
+            .size(5.dp)
+            .clip(CircleShape)
+            .background(couleur),
+    )
 }
 
 /**
@@ -1132,24 +1270,14 @@ private fun OngletTransferts(vm: HomeViewModel) {
                         texte = tr("Déposer", "Depoze"),
                         icone = Icons.Default.Add,
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            vm.montrerBientot(
-                                "Le dépôt d'argent arrive bientôt, avec l'intégration " +
-                                    "sécurisée de Mon Cash. 💳"
-                            )
-                        },
+                        onClick = { vm.ouvrirMoyens("DEPOT") },
                     )
                     Spacer(Modifier.width(12.dp))
                     BoutonWallet(
                         texte = tr("Retirer", "Retire"),
                         icone = Icons.AutoMirrored.Filled.CompareArrows,
                         modifier = Modifier.weight(1f),
-                        onClick = {
-                            vm.montrerBientot(
-                                "Le retrait d'argent arrive bientôt, avec l'intégration " +
-                                    "sécurisée de Mon Cash. 💳"
-                            )
-                        },
+                        onClick = { vm.ouvrirMoyens("RETRAIT") },
                     )
                 }
             }

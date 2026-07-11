@@ -157,6 +157,7 @@ fun EcranDetailSol(
     var menuOuvert by remember { mutableStateOf(false) }
     var historiqueOuvert by remember { mutableStateOf(false) }
     var voirTousMembres by remember { mutableStateOf(false) }
+    var assistantOuvert by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Fond : vagues violettes (image deja presente dans le projet).
@@ -198,6 +199,18 @@ fun EcranDetailSol(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                // Bouton Assistant du Sol (repond aux questions hors-ligne).
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(VioletVif)
+                        .clickable { assistantOuvert = true },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("✨", fontSize = 20.sp)
+                }
+                Spacer(Modifier.width(10.dp))
                 BoutonEntete(Icons.Default.Share, tr("Partager", "Pataje")) {
                     val partage = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
@@ -233,6 +246,15 @@ fun EcranDetailSol(
                         )
                     }
                 }
+            }
+
+            if (assistantOuvert) {
+                DialogueAssistant(
+                    detail = detail,
+                    monId = Session.utilisateurId,
+                    solde = vm.solde,
+                    onFermer = { assistantOuvert = false },
+                )
             }
 
             Spacer(Modifier.height(16.dp))
@@ -592,6 +614,17 @@ fun EcranDetailSol(
 
                     else -> {
                         val etatParMembre = detail.etatCotisations.associateBy { it.utilisateurId }
+                        // Membres dont le depot est soumis mais pas encore valide.
+                        val enValidationIds = vm.paiementsEnAttente
+                            .mapNotNull { it.utilisateurId }
+                            .toSet()
+
+                        // Recapitulatif de collecte : visible seulement pendant un tour ouvert.
+                        if (detail.etatCotisations.isNotEmpty()) {
+                            ResumeCotisations(detail.etatCotisations, enValidationIds)
+                            Spacer(Modifier.height(12.dp))
+                        }
+
                         val liste =
                             if (voirTousMembres) detail.membres else detail.membres.take(5)
                         liste.forEachIndexed { index, membre ->
@@ -599,6 +632,7 @@ fun EcranDetailSol(
                                 membre = membre,
                                 etat = etatParMembre[membre.utilisateurId],
                                 montantParDefaut = sol.montantCotisation,
+                                enValidation = enValidationIds.contains(membre.utilisateurId),
                             )
                             if (index < liste.lastIndex) Spacer(Modifier.height(8.dp))
                         }
@@ -1170,6 +1204,121 @@ private fun CarteProchainPaiement(
 }
 
 /**
+ * Recapitulatif de la collecte du tour en cours : combien de membres ont paye,
+ * sont en validation, en attente ou en retard. Vue d'ensemble en un coup d'oeil,
+ * avec une barre de progression et des pastilles de comptage.
+ */
+@Composable
+private fun ResumeCotisations(etats: List<EtatCotisation>, enValidationIds: Set<String>) {
+    val aujourdHui = java.time.LocalDate.now()
+    var payes = 0
+    var validation = 0
+    var retard = 0
+    var attente = 0
+    etats.forEach { e ->
+        val estPaye = e.statut.equals("VALIDE", true)
+        val estRejete = e.statut.equals("REJETE", true)
+        val estRetard = !estPaye && !estRejete && run {
+            try {
+                e.dateEcheance?.take(10)
+                    ?.let { java.time.LocalDate.parse(it).isBefore(aujourdHui) } ?: false
+            } catch (_: Throwable) {
+                false
+            }
+        }
+        when {
+            estPaye -> payes++
+            enValidationIds.contains(e.utilisateurId) -> validation++
+            estRetard -> retard++
+            else -> attente++
+        }
+    }
+    val total = etats.size
+    val fraction = if (total == 0) 0f else payes.toFloat() / total
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(CarteInterne.copy(alpha = 0.6f))
+            .padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("💰", fontSize = 16.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                tr("Paiements du tour", "Peman tou a"),
+                color = TexteBlanc,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                "$payes/$total " + tr("payées", "peye"),
+                color = VertOk,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                maxLines = 1,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        // Barre de progression des cotisations reglees.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(Color(0xFF39325E)),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(fraction)
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(VertOk),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        // Pastilles de comptage : seules celles a valeur non nulle apparaissent.
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (payes > 0) PastilleCompteur(VertOk, payes, tr("payé", "peye"))
+            if (validation > 0) PastilleCompteur(BleuAnneau, validation, tr("en validation", "ap verifye"))
+            if (attente > 0) PastilleCompteur(OrangeAttente, attente, tr("en attente", "ap tann"))
+            if (retard > 0) PastilleCompteur(RougeRetard, retard, tr("en retard", "an reta"))
+        }
+    }
+}
+
+/** Petite pastille « N libellé » avec un point colore (comptage de collecte). */
+@Composable
+private fun PastilleCompteur(couleur: Color, nombre: Int, libelle: String) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(couleur.copy(alpha = 0.16f))
+            .padding(horizontal = 9.dp, vertical = 4.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(7.dp)
+                .clip(CircleShape)
+                .background(couleur),
+        )
+        Spacer(Modifier.width(5.dp))
+        Text(
+            "$nombre $libelle",
+            color = couleur,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
  * Ligne d'un membre : numero, avatar, nom (une seule ligne, ellipse),
  * pastille « Vous » sous le nom, montant et etat alignes a droite.
  */
@@ -1178,6 +1327,7 @@ private fun LigneMembreSol(
     membre: MembreInfo,
     etat: EtatCotisation?,
     montantParDefaut: Double,
+    enValidation: Boolean = false,
 ) {
     val estMoi = membre.utilisateurId == Session.utilisateurId
 
@@ -1194,8 +1344,9 @@ private fun LigneMembreSol(
         etat == null -> "—" to TexteMuet
         etat.statut.equals("VALIDE", true) -> tr("Payé ✓", "Peye ✓") to VertOk
         etat.statut.equals("REJETE", true) -> tr("Rejeté ✗", "Rejte ✗") to RougeRetard
+        enValidation -> tr("En validation ⏳", "Ap verifye ⏳") to BleuAnneau
         enRetard -> tr("En retard !", "An reta !") to RougeRetard
-        else -> tr("En attente", "An atant") to OrangeAttente
+        else -> tr("Pas encore payé", "Poko peye") to OrangeAttente
     }
 
     Row(

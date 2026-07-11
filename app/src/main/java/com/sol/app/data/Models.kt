@@ -203,6 +203,18 @@ data class SolDetailResponse(
     val journal: List<EvenementJournal>?,
 )
 
+// ----- Calendrier intelligent : mes tours (distributions) -----
+
+data class MonTourResponse(
+    val solId: String,
+    val solNom: String?,
+    val numero: Int?,
+    val beneficiaireNom: String?,
+    val jeSuisBeneficiaire: Boolean,
+    val datePrevue: String?,   // format AAAA-MM-JJ
+    val statut: String?,
+)
+
 // ----- Messagerie (chat) -----
 
 data class MessageResponse(
@@ -211,9 +223,13 @@ data class MessageResponse(
     val expediteurNom: String?,
     val expediteurPhoto: String?,
     val contenu: String,
+    val pieceJointeUrl: String? = null,   // URL de l'image / document joint
+    val typePiece: String? = null,        // "IMAGE" ou "DOCUMENT"
     val dateEnvoi: String?,
 )
 
 data class EnvoyerMessageRequest(
     val contenu: String,
+    val pieceJointeUrl: String? = null,
+    val typePiece: String? = null,
 )
