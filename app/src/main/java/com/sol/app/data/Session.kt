@@ -49,6 +49,18 @@ object Session {
         get() = prefs.getString("langue", "fr") ?: "fr"
         set(value) = prefs.edit().putString("langue", value).apply()
 
+    /** Thème de l'interface : "SYSTEME" (suit le téléphone), "CLAIR" ou "SOMBRE". */
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "SYSTEME") ?: "SYSTEME"
+        set(value) = prefs.edit().putString("theme_mode", value).apply()
+
+    /** Date ISO du dernier contrôle des messages (borne des notifications). */
+    var dernierCheckMessages: String?
+        get() = prefs.getString("dernier_check_messages", null)
+        set(value) = prefs.edit().apply {
+            if (value == null) remove("dernier_check_messages") else putString("dernier_check_messages", value)
+        }.apply()
+
     /** Identifiant (téléphone ou email) mémorisé pour « Se souvenir de moi ». */
     var identifiantMemorise: String?
         get() = prefs.getString("identifiant_memo", null)

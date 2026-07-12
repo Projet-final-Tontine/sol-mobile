@@ -3,6 +3,7 @@ package com.sol.app
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -13,6 +14,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sol.app.data.Session
+import com.sol.app.data.ThemeApp
 import com.sol.app.ui.EcranVerrou
 import com.sol.app.ui.auth.LoginScreen
 import com.sol.app.ui.auth.RegisterScreen
@@ -26,7 +28,13 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            SolTheme {
+            // Thème choisi dans Profil : automatique (téléphone), clair ou sombre.
+            val sombre = when (ThemeApp.mode) {
+                "CLAIR" -> false
+                "SOMBRE" -> true
+                else -> isSystemInDarkTheme()
+            }
+            SolTheme(darkTheme = sombre) {
                 // Verrou a l'ouverture si l'utilisateur l'a active et est connecte.
                 var deverrouille by rememberSaveable {
                     mutableStateOf(!(Session.estConnecte && Session.verrouillageActif))

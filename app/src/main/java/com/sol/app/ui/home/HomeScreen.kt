@@ -61,9 +61,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -100,6 +102,7 @@ import com.sol.app.data.CotisationResponse
 import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.MembreSolResponse
 import com.sol.app.data.Network
+import com.sol.app.data.NotifsMessages
 import com.sol.app.data.Rappels
 import com.sol.app.data.Session
 import com.sol.app.data.SolResponse
@@ -111,7 +114,9 @@ import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import androidx.activity.compose.BackHandler
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     onDeconnexion: () -> Unit,
@@ -136,11 +141,26 @@ fun HomeScreen(
         // Programme les rappels de fond + verifie tout de suite les echeances.
         Rappels.planifier(contexte)
         Rappels.verifierMaintenant(contexte)
+        // Notifications de nouveaux messages (groupe + privé), meme app fermee.
+        NotifsMessages.planifier(contexte)
+        NotifsMessages.verifierMaintenant(contexte)
+    }
+
+    // « Retour » : ferme le chat / le détail, ou revient à l'Accueil, au lieu
+    // de quitter l'application.
+    BackHandler(enabled = vm.chatCible != null || vm.solDetail != null || onglet != 0) {
+        when {
+            vm.chatCible != null -> vm.fermerChat()
+            vm.solDetail != null -> vm.fermerDetail()
+            else -> onglet = 0
+        }
     }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
+            // Chat en plein écran : on masque la barre de navigation du bas.
+            if (vm.chatCible == null) {
             NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                 val elements = listOf(
                     Triple(tr("Accueil", "Akèy"), Icons.Default.Home, 0),
@@ -169,6 +189,7 @@ fun HomeScreen(
                         ),
                     )
                 }
+            }
             }
         },
         floatingActionButton = {
@@ -202,22 +223,37 @@ fun HomeScreen(
                 // Ecran de discussion (groupe ou prive).
                 ChatScreen(vm = vm, cible = chat, onFermer = { vm.fermerChat() })
             } else if (solOuvert != null) {
-                // Ecran plein « Détail du Sol » (remplace l'onglet courant).
-                EcranDetailSol(
-                    vm = vm,
-                    sol = solOuvert,
-                    onFermer = { vm.fermerDetail() },
-                    onVoirCalendrier = { vm.fermerDetail(); onglet = 0 },
-                )
-            } else when (onglet) {
-                0 -> OngletAccueil(
-                    vm,
-                    onVoirTontines = { onglet = 1 },
-                    onVoirActivite = { onglet = 2 },
-                )
-                1 -> OngletTontines(vm)
-                2 -> OngletTransferts(vm)
-                3 -> ProfilScreen(onDeconnexion)
+                // Ecran plein « Détail du Sol » : tirer vers le bas pour rafraîchir.
+                PullToRefreshBox(
+                    modifier = Modifier.fillMaxSize(),
+                    isRefreshing = vm.rafraichissement,
+                    onRefresh = { vm.rafraichirDetail() },
+                ) {
+                    EcranDetailSol(
+                        vm = vm,
+                        sol = solOuvert,
+                        onFermer = { vm.fermerDetail() },
+                        onVoirCalendrier = { vm.fermerDetail(); onglet = 0 },
+                    )
+                }
+            } else {
+                // Onglets : tirer vers le bas pour rafraîchir les données.
+                PullToRefreshBox(
+                    modifier = Modifier.fillMaxSize(),
+                    isRefreshing = vm.rafraichissement,
+                    onRefresh = { vm.rafraichirOnglet(onglet) },
+                ) {
+                    when (onglet) {
+                        0 -> OngletAccueil(
+                            vm,
+                            onVoirTontines = { onglet = 1 },
+                            onVoirActivite = { onglet = 2 },
+                        )
+                        1 -> OngletTontines(vm)
+                        2 -> OngletTransferts(vm)
+                        3 -> ProfilScreen(onDeconnexion)
+                    }
+                }
             }
         }
     }

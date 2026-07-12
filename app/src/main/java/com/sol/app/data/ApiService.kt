@@ -10,6 +10,7 @@ import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 /** Points d'acces de l'API backend utilises par l'application mobile. */
 interface ApiService {
@@ -82,6 +83,10 @@ interface ApiService {
 
     @GET("api/messages/prive/{autreId}")
     suspend fun messagesPrives(@Path("autreId") autreId: String): List<MessageResponse>
+
+    /** Messages récents destinés à l'utilisateur (notifications). */
+    @GET("api/messages/recents")
+    suspend fun messagesRecents(@Query("depuis") depuis: String?): List<MessageRecentResponse>
 
     @POST("api/messages/prive/{destinataireId}")
     suspend fun envoyerPrive(

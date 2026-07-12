@@ -263,3 +263,12 @@ data class EnvoyerMessageRequest(
     val pieceJointeUrl: String? = null,
     val typePiece: String? = null,
 )
+
+/** Message récent destiné à l'utilisateur (pour les notifications). */
+data class MessageRecentResponse(
+    val expediteurNom: String?,
+    val apercu: String?,
+    val solId: String? = null,   // null si message privé
+    val solNom: String? = null,  // nom du Sol (groupe) ou null (privé)
+    val dateEnvoi: String?,
+)

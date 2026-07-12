@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
@@ -71,6 +72,7 @@ import coil.compose.AsyncImage
 import com.sol.app.R
 import com.sol.app.data.I18n
 import com.sol.app.data.Network
+import com.sol.app.data.ThemeApp
 import com.sol.app.data.Session
 import com.sol.app.ui.peutUtiliserVerrou
 import androidx.compose.material3.Switch
@@ -87,6 +89,7 @@ fun ProfilScreen(
     var confirmerSuppressionPhoto by remember { mutableStateOf(false) }
     var documentOuvert by remember { mutableStateOf<String?>(null) }
     var dialogueLangueOuvert by remember { mutableStateOf(false) }
+    var dialogueThemeOuvert by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.chargerFiabilite() }
 
@@ -350,6 +353,26 @@ fun ProfilScreen(
 
         Spacer(Modifier.height(12.dp))
 
+        // 5b-bis. Thème de l'application (clair / sombre / automatique)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            LigneAction(
+                icone = { Icon(Icons.Default.DarkMode, null, tint = MaterialTheme.colorScheme.primary) },
+                titre = tr("Thème", "Tèm") + " : " + when (ThemeApp.mode) {
+                    "CLAIR" -> tr("Clair", "Klè")
+                    "SOMBRE" -> tr("Sombre", "Fonse")
+                    else -> tr("Automatique", "Otomatik")
+                },
+                onClick = { dialogueThemeOuvert = true },
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
         // 5c. Verrouillage biometrique de l'app
         val contexteVerrou = LocalContext.current
         var verrouActif by remember { mutableStateOf(Session.verrouillageActif) }
@@ -498,6 +521,17 @@ fun ProfilScreen(
                 dialogueLangueOuvert = false
             },
             onFermer = { dialogueLangueOuvert = false },
+        )
+    }
+
+    if (dialogueThemeOuvert) {
+        DialogueTheme(
+            themeActuel = ThemeApp.mode,
+            onChoisir = { mode ->
+                ThemeApp.definir(mode)
+                dialogueThemeOuvert = false
+            },
+            onFermer = { dialogueThemeOuvert = false },
         )
     }
 
@@ -855,6 +889,29 @@ private fun DialogueLangue(
             Column {
                 OptionLangue("Français", "fr", langueActuelle, onChoisir)
                 OptionLangue("Kreyòl ayisyen", "ht", langueActuelle, onChoisir)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onFermer) { Text(tr("Fermer", "Fèmen")) }
+        },
+    )
+}
+
+@Composable
+private fun DialogueTheme(
+    themeActuel: String,
+    onChoisir: (String) -> Unit,
+    onFermer: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onFermer,
+        shape = RoundedCornerShape(20.dp),
+        title = { Text(tr("Choisir le thème", "Chwazi tèm"), fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                OptionLangue(tr("Automatique (téléphone)", "Otomatik (telefòn)"), "SYSTEME", themeActuel, onChoisir)
+                OptionLangue(tr("Clair", "Klè"), "CLAIR", themeActuel, onChoisir)
+                OptionLangue(tr("Sombre", "Fonse"), "SOMBRE", themeActuel, onChoisir)
             }
         },
         confirmButton = {

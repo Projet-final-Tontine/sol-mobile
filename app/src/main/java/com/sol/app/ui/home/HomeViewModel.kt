@@ -167,6 +167,57 @@ class HomeViewModel : ViewModel() {
         chargerMesTours()
     }
 
+    /** Indicateur du « tirer pour rafraîchir » (pull-to-refresh). */
+    var rafraichissement by mutableStateOf(false)
+        private set
+
+    /** Recharge les données de l'onglet courant (tirer vers le bas). */
+    fun rafraichirOnglet(onglet: Int) {
+        viewModelScope.launch {
+            rafraichissement = true
+            try {
+                when (onglet) {
+                    0 -> {
+                        sols = Network.api.mesSols()
+                        cotisations = Network.api.mesCotisations()
+                        portefeuille = Network.api.portefeuille()
+                        mesTours = Network.api.mesTours()
+                    }
+                    1 -> sols = Network.api.mesSols()
+                    2 -> {
+                        portefeuille = Network.api.portefeuille()
+                        cotisations = Network.api.mesCotisations()
+                    }
+                }
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                rafraichissement = false
+            }
+        }
+    }
+
+    /** Recharge le détail du Sol affiché (tirer vers le bas). */
+    fun rafraichirDetail() {
+        val sol = solDetail ?: return
+        viewModelScope.launch {
+            rafraichissement = true
+            try {
+                membresDetail = Network.api.membresDuSol(sol.id)
+                paiementsEnAttente = Network.api.paiementsEnAttente(sol.id)
+                detailComplet = Network.api.detailDuSol(sol.id)
+                if (sol.mamanSolId == Session.utilisateurId) {
+                    demandesAdhesion = Network.api.demandesAdhesion(sol.id)
+                }
+                sondages = Network.api.sondagesDuSol(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                rafraichissement = false
+            }
+        }
+    }
+
     /** Recupere les tours (distributions) de tous mes Sols pour le calendrier. */
     fun chargerMesTours() {
         viewModelScope.launch {
