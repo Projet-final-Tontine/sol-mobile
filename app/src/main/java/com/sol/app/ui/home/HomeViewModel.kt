@@ -10,6 +10,10 @@ import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.EnvoyerMessageRequest
 import com.sol.app.data.MessageResponse
 import com.sol.app.data.MembreSolResponse
+import com.sol.app.data.CreerSondageRequest
+import com.sol.app.data.SondageResponse
+import com.sol.app.data.VoterRequest
+import com.sol.app.data.Session
 import com.sol.app.data.MonTourResponse
 import com.sol.app.data.Network
 import com.sol.app.data.OuvrirTourRequest
@@ -58,6 +62,14 @@ class HomeViewModel : ViewModel() {
     var solDetail by mutableStateOf<SolResponse?>(null)
         private set
     var membresDetail by mutableStateOf<List<MembreSolResponse>>(emptyList())
+        private set
+    // Demandes d'adhesion en attente (visibles par la Manman sol).
+    var demandesAdhesion by mutableStateOf<List<MembreSolResponse>>(emptyList())
+        private set
+    // Sondages / votes du Sol affiche.
+    var sondages by mutableStateOf<List<SondageResponse>>(emptyList())
+        private set
+    var dialogueSondageOuvert by mutableStateOf(false)
         private set
     // Detail complet du Sol : progression, tour courant, cotisations, position.
     var detailComplet by mutableStateOf<SolDetailResponse?>(null)
@@ -231,6 +243,8 @@ class HomeViewModel : ViewModel() {
         solDetail = sol
         membresDetail = emptyList()
         paiementsEnAttente = emptyList()
+        demandesAdhesion = emptyList()
+        sondages = emptyList()
         detailComplet = null
         chargementMembres = true
         viewModelScope.launch {
@@ -242,6 +256,101 @@ class HomeViewModel : ViewModel() {
                 erreur = messageErreur(e)
             } finally {
                 chargementMembres = false
+            }
+            // Demandes d'adhesion : seulement pour la Manman sol (appel isole).
+            if (sol.mamanSolId == Session.utilisateurId) {
+                try {
+                    demandesAdhesion = Network.api.demandesAdhesion(sol.id)
+                } catch (_: Throwable) {
+                    // Silencieux : pas de demandes ou acces non autorise.
+                }
+            }
+            // Sondages du Sol (visibles par tous les membres).
+            try {
+                sondages = Network.api.sondagesDuSol(sol.id)
+            } catch (_: Throwable) {
+                // Silencieux : pas de sondages ou acces non autorise.
+            }
+        }
+    }
+
+    fun ouvrirDialogueSondage() { dialogueSondageOuvert = true }
+    fun fermerDialogueSondage() { dialogueSondageOuvert = false }
+
+    /** Cree un sondage dans le Sol affiche. */
+    fun creerSondage(question: String, options: List<String>) {
+        val sol = solDetail ?: return
+        erreur = null
+        messageSucces = null
+        viewModelScope.launch {
+            try {
+                Network.api.creerSondage(sol.id, CreerSondageRequest(question, options))
+                messageSucces = "Sondage créé ! 🗳️"
+                sondages = Network.api.sondagesDuSol(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                dialogueSondageOuvert = false
+            }
+        }
+    }
+
+    /** Vote (ou change de vote) pour une option d'un sondage. */
+    fun voterSondage(sondageId: String, optionIndex: Int) {
+        val sol = solDetail ?: return
+        viewModelScope.launch {
+            try {
+                Network.api.voterSondage(sondageId, VoterRequest(optionIndex))
+                sondages = Network.api.sondagesDuSol(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            }
+        }
+    }
+
+    /** Clot un sondage (createur ou Manman sol). */
+    fun cloturerSondage(sondageId: String) {
+        val sol = solDetail ?: return
+        viewModelScope.launch {
+            try {
+                Network.api.cloturerSondage(sondageId)
+                sondages = Network.api.sondagesDuSol(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            }
+        }
+    }
+
+    /** Approuve une demande d'adhesion (Manman sol) puis rafraichit les listes. */
+    fun approuverMembre(membreSolId: String) {
+        val sol = solDetail ?: return
+        erreur = null
+        messageSucces = null
+        viewModelScope.launch {
+            try {
+                Network.api.approuverMembre(membreSolId)
+                messageSucces = "Membre approuvé ✅"
+                demandesAdhesion = Network.api.demandesAdhesion(sol.id)
+                membresDetail = Network.api.membresDuSol(sol.id)
+                detailComplet = Network.api.detailDuSol(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            }
+        }
+    }
+
+    /** Refuse une demande d'adhesion (Manman sol). */
+    fun refuserMembre(membreSolId: String) {
+        val sol = solDetail ?: return
+        erreur = null
+        messageSucces = null
+        viewModelScope.launch {
+            try {
+                Network.api.refuserMembre(membreSolId)
+                messageSucces = "Demande refusée."
+                demandesAdhesion = Network.api.demandesAdhesion(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
             }
         }
     }
@@ -387,7 +496,8 @@ class HomeViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 Network.api.rejoindre(RejoindreRequest(code.trim().uppercase()))
-                messageSucces = "Vous avez rejoint le Sol avec succès !"
+                messageSucces =
+                    "Demande d'adhésion envoyée ! En attente de l'approbation de la Manman sol. ⏳"
                 chargerTout()
             } catch (e: Throwable) {
                 erreur = messageErreur(e)

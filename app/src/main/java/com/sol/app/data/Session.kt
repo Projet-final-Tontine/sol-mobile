@@ -49,6 +49,18 @@ object Session {
         get() = prefs.getString("langue", "fr") ?: "fr"
         set(value) = prefs.edit().putString("langue", value).apply()
 
+    /** Identifiant (téléphone ou email) mémorisé pour « Se souvenir de moi ». */
+    var identifiantMemorise: String?
+        get() = prefs.getString("identifiant_memo", null)
+        set(value) = prefs.edit().apply {
+            if (value.isNullOrBlank()) remove("identifiant_memo") else putString("identifiant_memo", value)
+        }.apply()
+
+    /** Verrouillage de l'app (empreinte / visage / code) active par l'utilisateur. */
+    var verrouillageActif: Boolean
+        get() = prefs.getBoolean("verrou", false)
+        set(value) = prefs.edit().putBoolean("verrou", value).apply()
+
     val estConnecte: Boolean
         get() = token != null
 

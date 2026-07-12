@@ -215,6 +215,36 @@ data class MonTourResponse(
     val statut: String?,
 )
 
+// ----- Sondages / votes de groupe -----
+
+data class CreerSondageRequest(
+    val question: String,
+    val options: List<String>,
+)
+
+data class VoterRequest(
+    val optionIndex: Int,
+)
+
+data class OptionResultat(
+    val index: Int,
+    val texte: String,
+    val votes: Int,
+    val pourcentage: Int,
+)
+
+data class SondageResponse(
+    val id: String,
+    val question: String,
+    val createurNom: String?,
+    val statut: String,          // OUVERT, CLOS
+    val dateCreation: String?,
+    val totalVotes: Int,
+    val monVoteIndex: Int?,      // index de mon vote, ou null
+    val peutCloturer: Boolean,
+    val options: List<OptionResultat>,
+)
+
 // ----- Messagerie (chat) -----
 
 data class MessageResponse(

@@ -35,8 +35,39 @@ interface ApiService {
     @GET("api/sols/{solId}/membres")
     suspend fun membresDuSol(@Path("solId") solId: String): List<MembreSolResponse>
 
+    // ----- Demandes d'adhesion (Manman sol) -----
+
+    @GET("api/sols/{solId}/demandes")
+    suspend fun demandesAdhesion(@Path("solId") solId: String): List<MembreSolResponse>
+
+    @POST("api/sols/membres/{membreSolId}/approuver")
+    suspend fun approuverMembre(@Path("membreSolId") membreSolId: String): MembreSolResponse
+
+    @POST("api/sols/membres/{membreSolId}/refuser")
+    suspend fun refuserMembre(@Path("membreSolId") membreSolId: String): Response<Unit>
+
     @GET("api/sols/{solId}/detail")
     suspend fun detailDuSol(@Path("solId") solId: String): SolDetailResponse
+
+    // ----- Sondages / votes -----
+
+    @POST("api/sols/{solId}/sondages")
+    suspend fun creerSondage(
+        @Path("solId") solId: String,
+        @Body body: CreerSondageRequest,
+    ): SondageResponse
+
+    @GET("api/sols/{solId}/sondages")
+    suspend fun sondagesDuSol(@Path("solId") solId: String): List<SondageResponse>
+
+    @POST("api/sondages/{sondageId}/voter")
+    suspend fun voterSondage(
+        @Path("sondageId") sondageId: String,
+        @Body body: VoterRequest,
+    ): SondageResponse
+
+    @POST("api/sondages/{sondageId}/cloturer")
+    suspend fun cloturerSondage(@Path("sondageId") sondageId: String): SondageResponse
 
     // ----- Messagerie -----
 

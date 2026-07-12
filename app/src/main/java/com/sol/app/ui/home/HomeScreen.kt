@@ -1,7 +1,12 @@
 package com.sol.app.ui.home
 
 import android.Manifest
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -35,6 +40,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Notifications
@@ -99,6 +105,10 @@ import com.sol.app.data.Session
 import com.sol.app.data.SolResponse
 import com.sol.app.data.tr
 import com.sol.app.ui.theme.SolViolet
+import com.google.zxing.BinaryBitmap
+import com.google.zxing.MultiFormatReader
+import com.google.zxing.RGBLuminanceSource
+import com.google.zxing.common.HybridBinarizer
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
@@ -1788,16 +1798,64 @@ private fun DialogueOuvrirTour(
 
 // ---------- Dialogue rejoindre ----------
 
+/**
+ * Decode un QR code present dans une image de la galerie (zxing, hors-ligne).
+ * Renvoie le texte du QR (le code d'invitation) ou null si rien n'est trouve.
+ */
+private fun decoderQrDepuisImage(context: android.content.Context, uri: Uri): String? {
+    return try {
+        val bitmap = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decodeur, _, _ ->
+                decodeur.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                decodeur.isMutableRequired = true
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            MediaStore.Images.Media.getBitmap(context.contentResolver, uri)
+        }
+        val argb = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+        val largeur = argb.width
+        val hauteur = argb.height
+        val pixels = IntArray(largeur * hauteur)
+        argb.getPixels(pixels, 0, largeur, 0, 0, largeur, hauteur)
+        val source = RGBLuminanceSource(largeur, hauteur, pixels)
+        val binaire = BinaryBitmap(HybridBinarizer(source))
+        MultiFormatReader().decode(binaire).text
+    } catch (_: Throwable) {
+        null
+    }
+}
+
 @Composable
 private fun DialogueRejoindre(
     onValider: (String) -> Unit,
     onAnnuler: () -> Unit,
 ) {
     var code by remember { mutableStateOf("") }
+    val contexte = LocalContext.current
 
     // Scanner de QR code : le contenu du QR est le code d'invitation.
     val lanceurScan = rememberLauncherForActivityResult(ScanContract()) { resultat ->
         resultat.contents?.let { code = it.trim().uppercase() }
+    }
+
+    // Import d'un QR code depuis la galerie : on decode l'image choisie.
+    val lanceurGalerie = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            val texte = decoderQrDepuisImage(contexte, uri)
+            if (texte != null) {
+                code = texte.trim().uppercase()
+            } else {
+                Toast.makeText(
+                    contexte,
+                    tr("Aucun QR code trouvé dans l'image.", "Pa jwenn QR kòd nan foto a."),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
     }
 
     AlertDialog(
@@ -1856,6 +1914,19 @@ private fun DialogueRejoindre(
                     Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(tr("Scanner un QR code", "Eskane yon QR kòd"), fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { lanceurGalerie.launch("image/*") },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        tr("Importer depuis la galerie", "Enpòte depi galri a"),
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
             }
         },

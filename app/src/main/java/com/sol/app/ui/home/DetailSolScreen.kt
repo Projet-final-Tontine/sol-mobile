@@ -1,7 +1,12 @@
 package com.sol.app.ui.home
 
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.os.Build
+import android.provider.MediaStore
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -32,11 +37,14 @@ import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Timelapse
@@ -134,6 +142,31 @@ private fun genererQr(texte: String, taille: Int): Bitmap {
         }
     }
     return bitmap
+}
+
+/**
+ * Enregistre le QR code dans la galerie (dossier Pictures/SolEnLigne) via MediaStore.
+ * Fonctionne sans permission sur Android 10+ ; renvoie vrai en cas de succes.
+ */
+private fun enregistrerQrGalerie(context: Context, bitmap: Bitmap, nom: String): Boolean {
+    return try {
+        val valeurs = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$nom.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/SolEnLigne")
+            }
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, valeurs)
+            ?: return false
+        resolver.openOutputStream(uri)?.use { flux ->
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, flux)
+        } ?: return false
+        true
+    } catch (_: Throwable) {
+        false
+    }
 }
 
 /**
@@ -352,6 +385,35 @@ fun EcranDetailSol(
                             contentDescription = tr("Copier", "Kopye"),
                             tint = VioletDoux,
                             modifier = Modifier.size(15.dp),
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    // Telecharger le QR code dans la galerie du telephone.
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(CarteInterne)
+                            .clickable {
+                                val image = genererQr(sol.codeInvitation, 800)
+                                val ok = enregistrerQrGalerie(
+                                    contexte, image, "QR_${sol.codeInvitation}"
+                                )
+                                Toast.makeText(
+                                    contexte,
+                                    if (ok) tr("QR code enregistré dans la galerie ✅",
+                                        "QR kòd anrejistre nan galri a ✅")
+                                    else tr("Échec de l'enregistrement.", "Anrejistreman echwe."),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = tr("Télécharger le QR", "Telechaje QR a"),
+                            tint = VioletDoux,
+                            modifier = Modifier.size(16.dp),
                         )
                     }
                 }
@@ -640,6 +702,47 @@ fun EcranDetailSol(
                 }
             }
 
+            Spacer(Modifier.height(16.dp))
+
+            // ================= DEMANDES D'ADHESION (Manman sol) =================
+            if (estMamanSol && vm.demandesAdhesion.isNotEmpty()) {
+                CarteDetail {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("✋", fontSize = 18.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            tr("Demandes d'adhésion", "Demann pou antre") +
+                                " (${vm.demandesAdhesion.size})",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TexteBlanc,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        tr("Acceptez ou refusez les nouveaux membres.",
+                            "Aksepte oswa refize nouvo manm yo."),
+                        fontSize = 12.sp,
+                        color = TexteMuet,
+                        maxLines = 2,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    vm.demandesAdhesion.forEachIndexed { index, demande ->
+                        LigneDemande(
+                            nom = demande.nomComplet ?: "Membre",
+                            onApprouver = { vm.approuverMembre(demande.id) },
+                            onRefuser = { vm.refuserMembre(demande.id) },
+                        )
+                        if (index < vm.demandesAdhesion.lastIndex) Spacer(Modifier.height(8.dp))
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // ================= VOTES / SONDAGES =================
+            SectionSondages(vm)
             Spacer(Modifier.height(16.dp))
 
             // ================= TUILES D'ACTION =================
@@ -1315,6 +1418,76 @@ private fun PastilleCompteur(couleur: Color, nombre: Int, libelle: String) {
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
         )
+    }
+}
+
+/** Ligne d'une demande d'adhesion : nom + boutons Refuser / Approuver. */
+@Composable
+private fun LigneDemande(nom: String, onApprouver: () -> Unit, onRefuser: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(CarteInterne.copy(alpha = 0.45f))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Color(0xFF39325E)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Person,
+                contentDescription = null,
+                tint = TexteMuet,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            nom,
+            color = TexteBlanc,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(RougeRetard.copy(alpha = 0.18f))
+                .clickable { onRefuser() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = tr("Refuser", "Refize"),
+                tint = RougeRetard,
+                modifier = Modifier.size(18.dp),
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .size(38.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(VertOk.copy(alpha = 0.18f))
+                .clickable { onApprouver() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = tr("Approuver", "Apwouve"),
+                tint = VertOk,
+                modifier = Modifier.size(18.dp),
+            )
+        }
     }
 }
 

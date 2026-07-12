@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,13 +17,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sol.app.R
+import com.sol.app.data.Session
 
 @Composable
 fun LoginScreen(
@@ -60,9 +63,10 @@ fun LoginScreen(
     onAllerInscription: () -> Unit,
     vm: AuthViewModel = viewModel(),
 ) {
-    var telephone by rememberSaveable { mutableStateOf("") }
+    var telephone by rememberSaveable { mutableStateOf(Session.identifiantMemorise ?: "") }
     var motDePasse by rememberSaveable { mutableStateOf("") }
     var motDePasseVisible by rememberSaveable { mutableStateOf(false) }
+    var seSouvenir by rememberSaveable { mutableStateOf(Session.identifiantMemorise != null) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -165,12 +169,12 @@ fun LoginScreen(
                     OutlinedTextField(
                         value = telephone,
                         onValueChange = { telephone = it },
-                        label = { Text("Telephone") },
+                        label = { Text("Téléphone ou email") },
                         leadingIcon = {
-                            Icon(Icons.Default.Phone, contentDescription = null)
+                            Icon(Icons.Default.Person, contentDescription = null)
                         },
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -203,7 +207,22 @@ fun LoginScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Checkbox(
+                            checked = seSouvenir,
+                            onCheckedChange = { seSouvenir = it },
+                        )
+                        Text(
+                            "Se souvenir de moi",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
                     TextButton(
                         onClick = { },
                         modifier = Modifier.align(Alignment.End),
@@ -218,7 +237,10 @@ fun LoginScreen(
                     Spacer(Modifier.height(8.dp))
 
                     Button(
-                        onClick = { vm.connexion(telephone, motDePasse, onConnecte) },
+                        onClick = {
+                            Session.identifiantMemorise = if (seSouvenir) telephone.trim() else null
+                            vm.connexion(telephone, motDePasse, onConnecte)
+                        },
                         enabled = !vm.enChargement,
                         modifier = Modifier
                             .fillMaxWidth()

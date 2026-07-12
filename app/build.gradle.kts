@@ -69,6 +69,9 @@ dependencies {
     // Rappels de cotisation en tache de fond (notifications, meme app fermee)
     implementation("androidx.work:work-runtime-ktx:2.9.1")
 
+    // Verrouillage de l'app par empreinte / visage / code du telephone
+    implementation("androidx.biometric:biometric:1.1.0")
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

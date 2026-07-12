@@ -72,6 +72,9 @@ import com.sol.app.R
 import com.sol.app.data.I18n
 import com.sol.app.data.Network
 import com.sol.app.data.Session
+import com.sol.app.ui.peutUtiliserVerrou
+import androidx.compose.material3.Switch
+import androidx.compose.material.icons.filled.Fingerprint
 import com.sol.app.data.tr
 
 /** Page « Mon Profil » : photo, KYC, informations, securite, documents. */
@@ -343,6 +346,53 @@ fun ProfilScreen(
                     if (I18n.langue == "ht") "Kreyòl ayisyen" else "Français",
                 onClick = { dialogueLangueOuvert = true },
             )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // 5c. Verrouillage biometrique de l'app
+        val contexteVerrou = LocalContext.current
+        var verrouActif by remember { mutableStateOf(Session.verrouillageActif) }
+        val verrouDispo = remember { peutUtiliserVerrou(contexteVerrou) }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Fingerprint, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        tr("Verrouillage de l'app", "Bloke app la"),
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                    )
+                    Text(
+                        if (verrouDispo)
+                            tr("Empreinte, visage ou code du téléphone", "Anprint, figi oswa kòd telefòn")
+                        else tr("Non disponible sur cet appareil", "Pa disponib sou aparèy sa a"),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                    )
+                }
+                Switch(
+                    checked = verrouActif,
+                    enabled = verrouDispo,
+                    onCheckedChange = {
+                        verrouActif = it
+                        Session.verrouillageActif = it
+                    },
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))
