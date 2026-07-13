@@ -1,7 +1,9 @@
 package com.sol.app.ui.auth
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,17 +23,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -98,38 +101,50 @@ fun LoginScreen(
         ) {
             Spacer(Modifier.height(60.dp))
 
-            Image(
-                painter = painterResource(R.drawable.logo),
-                contentDescription = "Logo SOL",
+            // Logo dans un anneau lumineux (halo translucide + lisere blanc).
+            Box(
                 modifier = Modifier
-                    .size(100.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop,
-            )
+                    .size(116.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.logo),
+                    contentDescription = "Logo SOL",
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clip(CircleShape)
+                        .border(2.dp, Color.White.copy(alpha = 0.55f), CircleShape),
+                    contentScale = ContentScale.Crop,
+                )
+            }
             Spacer(Modifier.height(16.dp))
 
             Text(
                 text = "SOL EN LIGNE",
                 style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
-                letterSpacing = 2.sp,
+                letterSpacing = 3.sp,
             )
+            Spacer(Modifier.height(4.dp))
             Text(
-                text = "Votre tontine numerique",
+                text = "Votre tontine numérique 🇭🇹",
                 style = MaterialTheme.typography.bodyLarge,
                 color = Color(0xCCFFFFFF),
             )
 
-            Spacer(Modifier.height(40.dp))
+            Spacer(Modifier.height(36.dp))
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(28.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
             ) {
                 Column(
                     modifier = Modifier.padding(24.dp),
@@ -141,12 +156,14 @@ fun LoginScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
+                    AccentTitre(Modifier.padding(top = 6.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Connectez-vous a votre compte",
+                        text = "Heureux de vous revoir ! 👋",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(22.dp))
 
                     vm.erreur?.let {
                         Card(
@@ -175,7 +192,8 @@ fun LoginScreen(
                         },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = couleursChampAuth(),
                         modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(Modifier.height(14.dp))
@@ -185,10 +203,7 @@ fun LoginScreen(
                         onValueChange = { motDePasse = it },
                         label = { Text("Mot de passe") },
                         leadingIcon = {
-                            Icon(
-                                painter = painterResource(android.R.drawable.ic_lock_idle_lock),
-                                contentDescription = null,
-                            )
+                            Icon(Icons.Outlined.Lock, contentDescription = null)
                         },
                         trailingIcon = {
                             IconButton(onClick = { motDePasseVisible = !motDePasseVisible }) {
@@ -203,11 +218,13 @@ fun LoginScreen(
                         visualTransformation = if (motDePasseVisible) VisualTransformation.None
                         else PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = couleursChampAuth(),
                         modifier = Modifier.fillMaxWidth(),
                     )
 
                     Spacer(Modifier.height(4.dp))
+                    // « Se souvenir » et « Mot de passe oublié ? » sur la meme ligne.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -218,63 +235,68 @@ fun LoginScreen(
                         )
                         Text(
                             "Se souvenir de moi",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-
-                    TextButton(
-                        onClick = { },
-                        modifier = Modifier.align(Alignment.End),
-                    ) {
-                        Text(
-                            "Mot de passe oublie ?",
-                            color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f),
                         )
+                        TextButton(onClick = { }) {
+                            Text(
+                                "Mot de passe oublié ?",
+                                color = MaterialTheme.colorScheme.primary,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                            )
+                        }
                     }
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
 
-                    Button(
+                    BoutonDegrade(
+                        texte = "Se connecter",
+                        enChargement = vm.enChargement,
                         onClick = {
                             Session.identifiantMemorise = if (seSouvenir) telephone.trim() else null
                             vm.connexion(telephone, motDePasse, onConnecte)
                         },
-                        enabled = !vm.enChargement,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                        ),
-                    ) {
-                        if (vm.enChargement) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                strokeWidth = 2.dp,
-                            )
-                        } else {
-                            Text(
-                                "Se connecter",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                        }
-                    }
+                    )
                 }
             }
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(24.dp))
 
-            TextButton(onClick = onAllerInscription) {
-                Text(
-                    "Pas encore de compte ? S'inscrire",
-                    color = Color.White,
-                    fontWeight = FontWeight.Medium,
+            // Separateur « ou » puis invitation a creer un compte.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = Color.White.copy(alpha = 0.35f),
                 )
+                Text(
+                    "  ou  ",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                HorizontalDivider(
+                    modifier = Modifier.weight(1f),
+                    color = Color.White.copy(alpha = 0.35f),
+                )
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            OutlinedButton(
+                onClick = onAllerInscription,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, Color.White.copy(alpha = 0.7f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+            ) {
+                Text("Créer un compte", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             }
 
             Spacer(Modifier.height(24.dp))

@@ -1,6 +1,7 @@
 package com.sol.app.ui.auth
 
 import android.util.Patterns
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,17 +18,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -39,6 +43,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +60,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -136,31 +142,44 @@ fun RegisterScreen(
         Spacer(Modifier.height(40.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onRetour) {
+            IconButton(
+                onClick = onRetour,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.15f)),
+            ) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = "Retour",
                     tint = Color.White,
                 )
             }
-            Spacer(Modifier.width(4.dp))
-            Text(
-                text = "Créer un compte",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = Color.White,
-            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "Créer un compte",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                )
+                Text(
+                    text = "Rejoignez la communauté SOL 🤝",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+            }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f),
             ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.25f)),
         ) {
         Column(modifier = Modifier.padding(20.dp)) {
 
@@ -183,15 +202,20 @@ fun RegisterScreen(
         }
 
         // ----- Identite -----
+        TitreSectionAuth("👤", "Identité")
+        Spacer(Modifier.height(8.dp))
+
         OutlinedTextField(
             value = nom,
             onValueChange = { nom = it },
             label = { Text("Nom") },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             supportingText = {
                 Text("* Entrez votre nom tel qu'il apparaît sur votre passeport ou votre pièce d'identité officielle.")
             },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = couleursChampAuth(),
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -200,11 +224,13 @@ fun RegisterScreen(
             value = prenom,
             onValueChange = { prenom = it },
             label = { Text("Prénom") },
+            leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
             supportingText = {
                 Text("* Entrez votre prénom tel qu'il apparaît sur votre passeport ou votre pièce d'identité officielle.")
             },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = couleursChampAuth(),
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -238,24 +264,7 @@ fun RegisterScreen(
                 ),
             )
         }
-        Spacer(Modifier.height(14.dp))
-
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Adresse e-mail") },
-            singleLine = true,
-            isError = email.isNotBlank() && !emailValide,
-            supportingText = {
-                if (email.isNotBlank() && !emailValide) {
-                    Text("Adresse e-mail invalide.", color = MaterialTheme.colorScheme.error)
-                }
-            },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
         // Date de naissance via calendrier
         OutlinedTextField(
@@ -263,6 +272,7 @@ fun RegisterScreen(
             onValueChange = { },
             readOnly = true,
             label = { Text("Date de naissance") },
+            leadingIcon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
             supportingText = {
                 Text("* Sélectionnez votre date de naissance à l'aide du calendrier ; elle doit correspondre à votre pièce d'identité.")
             },
@@ -275,7 +285,35 @@ fun RegisterScreen(
                     )
                 }
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = couleursChampAuth(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 14.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        )
+
+        // ----- Contact -----
+        TitreSectionAuth("📞", "Contact")
+        Spacer(Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = email,
+            onValueChange = { email = it },
+            label = { Text("Adresse e-mail") },
+            leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+            singleLine = true,
+            isError = email.isNotBlank() && !emailValide,
+            supportingText = {
+                if (email.isNotBlank() && !emailValide) {
+                    Text("Adresse e-mail invalide.", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+            shape = RoundedCornerShape(14.dp),
+            colors = couleursChampAuth(),
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -290,7 +328,7 @@ fun RegisterScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             OutlinedButton(
                 onClick = { montrerChoixPays = true },
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.height(56.dp),
             ) {
                 Text("${drapeauEmoji(isoPays)} $indicatif", fontSize = 16.sp)
@@ -303,16 +341,26 @@ fun RegisterScreen(
                 singleLine = true,
                 isError = telephone.isNotBlank() && !telephoneValide,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                shape = RoundedCornerShape(12.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = couleursChampAuth(),
                 modifier = Modifier.weight(1f),
             )
         }
-        Spacer(Modifier.height(14.dp))
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 14.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        )
+
+        // ----- Securite -----
+        TitreSectionAuth("🔐", "Sécurité")
+        Spacer(Modifier.height(8.dp))
 
         OutlinedTextField(
             value = motDePasse,
             onValueChange = { motDePasse = it },
             label = { Text("Mot de passe") },
+            leadingIcon = { Icon(Icons.Outlined.Lock, contentDescription = null) },
             supportingText = { Text("8 caractères minimum.") },
             singleLine = true,
             visualTransformation = if (motDePasseVisible) VisualTransformation.None
@@ -327,13 +375,22 @@ fun RegisterScreen(
                     )
                 }
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = couleursChampAuth(),
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(16.dp))
+        // Jauge visuelle de solidite du mot de passe.
+        BarreForceMotDePasse(motDePasse)
+
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 14.dp),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+        )
 
         // ----- Conditions -----
+        TitreSectionAuth("✅", "Conditions")
+        Spacer(Modifier.height(4.dp))
         CaseACocher(
             coche = accepteConditions,
             onChange = { accepteConditions = it },
@@ -353,7 +410,10 @@ fun RegisterScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        Button(
+        BoutonDegrade(
+            texte = "Créer un compte",
+            enabled = formulaireValide,
+            enChargement = vm.enChargement,
             onClick = {
                 vm.inscription(
                     InscriptionRequest(
@@ -370,25 +430,7 @@ fun RegisterScreen(
                     onInscrit,
                 )
             },
-            enabled = formulaireValide && !vm.enChargement,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-            ),
-        ) {
-            if (vm.enChargement) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    color = MaterialTheme.colorScheme.onPrimary,
-                    strokeWidth = 2.dp,
-                )
-            } else {
-                Text("Créer un compte", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
+        )
 
         TextButton(
             onClick = onRetour,
@@ -496,6 +538,54 @@ private fun DialogueChoixPays(
             TextButton(onClick = onFermer) { Text("Fermer") }
         },
     )
+}
+
+/**
+ * Jauge de solidite du mot de passe : 4 segments colores + libelle.
+ * Rouge = faible, orange = moyen, vert = bon / excellent.
+ */
+@Composable
+private fun BarreForceMotDePasse(motDePasse: String) {
+    if (motDePasse.isEmpty()) return
+    val score = forceMotDePasse(motDePasse)
+    val (libelle, couleur) = when {
+        score <= 1 -> "Faible" to Color(0xFFE53935)
+        score == 2 -> "Moyen" to Color(0xFFFB8C00)
+        score == 3 -> "Bon" to Color(0xFF43A047)
+        else -> "Excellent" to Color(0xFF1B8A4E)
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, bottom = 2.dp),
+    ) {
+        repeat(4) { i ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(
+                        if (i < score) couleur
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    ),
+            )
+            if (i < 3) Spacer(Modifier.width(6.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(libelle, fontSize = 12.sp, color = couleur, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Score de 0 a 4 : longueur, longueur forte, lettres+chiffres, caractere special. */
+private fun forceMotDePasse(motDePasse: String): Int {
+    var score = 0
+    if (motDePasse.length >= 8) score++
+    if (motDePasse.length >= 12) score++
+    if (motDePasse.any { it.isDigit() } && motDePasse.any { it.isLetter() }) score++
+    if (motDePasse.any { !it.isLetterOrDigit() }) score++
+    return score
 }
 
 @Composable
