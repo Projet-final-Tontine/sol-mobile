@@ -264,6 +264,26 @@ data class EnvoyerMessageRequest(
     val typePiece: String? = null,
 )
 
+/** Relevé de Fiabilité Financière du membre (certificat vérifiable par QR). */
+data class ReleveResponse(
+    val reference: String,
+    val nomComplet: String?,
+    val membreDepuis: String?,
+    val nbSols: Int,
+    val totalCotise: Double,
+    val nbCotisations: Int,
+    val nbATemps: Int,
+    val nbRetards: Int,
+    val nbDefauts: Int,
+    val scoreGlobal: Int,
+    val note: String,
+    val niveau: String,
+    val historiqueSuffisant: Boolean,
+    val dateEmission: String?,
+    val hash: String,
+    val urlVerification: String,
+)
+
 /** Message récent destiné à l'utilisateur (pour les notifications). */
 data class MessageRecentResponse(
     val expediteurNom: String?,

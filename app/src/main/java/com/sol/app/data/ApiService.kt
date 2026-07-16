@@ -88,6 +88,10 @@ interface ApiService {
     @GET("api/messages/recents")
     suspend fun messagesRecents(@Query("depuis") depuis: String?): List<MessageRecentResponse>
 
+    /** Génère le Relevé de Fiabilité Financière du membre connecté. */
+    @GET("api/releve")
+    suspend fun monReleve(): ReleveResponse
+
     @POST("api/messages/prive/{destinataireId}")
     suspend fun envoyerPrive(
         @Path("destinataireId") destinataireId: String,

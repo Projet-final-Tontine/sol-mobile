@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -90,6 +91,7 @@ fun ProfilScreen(
     var documentOuvert by remember { mutableStateOf<String?>(null) }
     var dialogueLangueOuvert by remember { mutableStateOf(false) }
     var dialogueThemeOuvert by remember { mutableStateOf(false) }
+    var montrerReleve by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.chargerFiabilite() }
 
@@ -287,6 +289,33 @@ fun ProfilScreen(
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // 3b. Relevé de Fiabilité Financière (certificat vérifiable)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                LigneAction(
+                    icone = { Icon(Icons.Default.Verified, null, tint = MaterialTheme.colorScheme.primary) },
+                    titre = tr("Mon Relevé de Fiabilité", "Relve Fyabilite mwen"),
+                    onClick = { montrerReleve = true },
+                )
+                Text(
+                    tr(
+                        "Un certificat officiel de votre ponctualité, vérifiable par une banque.",
+                        "Yon sètifika ofisyèl sou jan ou peye alè, yon bank ka verifye l.",
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 18.dp),
                 )
             }
         }
@@ -533,6 +562,15 @@ fun ProfilScreen(
             },
             onFermer = { dialogueThemeOuvert = false },
         )
+    }
+
+    if (montrerReleve) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { montrerReleve = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            EcranReleve(onFermer = { montrerReleve = false })
+        }
     }
 
     if (confirmerDeconnexion) {
