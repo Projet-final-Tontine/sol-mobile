@@ -264,6 +264,41 @@ data class EnvoyerMessageRequest(
     val typePiece: String? = null,
 )
 
+// ---------------- Fon Sekou (caisse de solidarité) ----------------
+
+data class FonSekouResponse(
+    val solde: Double,
+    val estMamanSol: Boolean,
+    val demandes: List<DemandeSekouInfo>,
+)
+
+data class DemandeSekouInfo(
+    val id: String,
+    val demandeurId: String,
+    val demandeurNom: String?,
+    val type: String,
+    val montant: Double,
+    val motif: String,
+    val justificatifUrl: String?,
+    val statut: String,          // EN_ATTENTE, PAYE, REJETE
+    val nbPour: Long,
+    val nbContre: Long,
+    val monVote: Boolean?,        // true=pour, false=contre, null=pas voté
+    val estMoi: Boolean,
+    val dateCreation: String?,
+)
+
+data class ContribuerRequest(val montant: Double)
+
+data class DemanderSekouRequest(
+    val type: String,
+    val montant: Double,
+    val motif: String,
+    val justificatifUrl: String? = null,
+)
+
+data class VoterSekouRequest(val pour: Boolean)
+
 /** Relevé de Fiabilité Financière du membre (certificat vérifiable par QR). */
 data class ReleveResponse(
     val reference: String,

@@ -5,8 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.sol.app.data.ContribuerRequest
 import com.sol.app.data.CotisationResponse
 import com.sol.app.data.CreerSolRequest
+import com.sol.app.data.DemanderSekouRequest
+import com.sol.app.data.FonSekouResponse
+import com.sol.app.data.VoterSekouRequest
 import com.sol.app.data.EnvoyerMessageRequest
 import com.sol.app.data.MessageResponse
 import com.sol.app.data.MembreSolResponse
@@ -70,6 +74,13 @@ class HomeViewModel : ViewModel() {
     var sondages by mutableStateOf<List<SondageResponse>>(emptyList())
         private set
     var dialogueSondageOuvert by mutableStateOf(false)
+        private set
+    // Fon Sekou (caisse de solidarite) du Sol affiche.
+    var fonSekou by mutableStateOf<FonSekouResponse?>(null)
+        private set
+    var dialogueContribuerOuvert by mutableStateOf(false)
+        private set
+    var dialogueDemandeSekouOuvert by mutableStateOf(false)
         private set
     // Detail complet du Sol : progression, tour courant, cotisations, position.
     var detailComplet by mutableStateOf<SolDetailResponse?>(null)
@@ -210,6 +221,7 @@ class HomeViewModel : ViewModel() {
                     demandesAdhesion = Network.api.demandesAdhesion(sol.id)
                 }
                 sondages = Network.api.sondagesDuSol(sol.id)
+                fonSekou = Network.api.fonSekou(sol.id)
             } catch (e: Throwable) {
                 erreur = messageErreur(e)
             } finally {
@@ -322,6 +334,12 @@ class HomeViewModel : ViewModel() {
             } catch (_: Throwable) {
                 // Silencieux : pas de sondages ou acces non autorise.
             }
+            // Fon Sekou (caisse de solidarite).
+            try {
+                fonSekou = Network.api.fonSekou(sol.id)
+            } catch (_: Throwable) {
+                // Silencieux : pas d'acces.
+            }
         }
     }
 
@@ -366,6 +384,76 @@ class HomeViewModel : ViewModel() {
             try {
                 Network.api.cloturerSondage(sondageId)
                 sondages = Network.api.sondagesDuSol(sol.id)
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            }
+        }
+    }
+
+    // ---------- Fon Sekou (caisse de solidarite) ----------
+
+    fun ouvrirDialogueContribuer() { dialogueContribuerOuvert = true }
+    fun fermerDialogueContribuer() { dialogueContribuerOuvert = false }
+    fun ouvrirDialogueDemandeSekou() { dialogueDemandeSekouOuvert = true }
+    fun fermerDialogueDemandeSekou() { dialogueDemandeSekouOuvert = false }
+
+    /** Alimente la caisse de solidarite depuis le portefeuille. */
+    fun contribuerSekou(montant: Double) {
+        val sol = solDetail ?: return
+        erreur = null
+        messageSucces = null
+        viewModelScope.launch {
+            try {
+                fonSekou = Network.api.contribuerSekou(sol.id, ContribuerRequest(montant))
+                messageSucces = "Merci ! Votre contribution renforce la caisse. 🛡️"
+                chargerPortefeuille()
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                dialogueContribuerOuvert = false
+            }
+        }
+    }
+
+    /** Depose une demande de secours. */
+    fun demanderSekou(type: String, montant: Double, motif: String) {
+        val sol = solDetail ?: return
+        erreur = null
+        messageSucces = null
+        viewModelScope.launch {
+            try {
+                fonSekou = Network.api.demanderSekou(
+                    sol.id, DemanderSekouRequest(type, montant, motif)
+                )
+                messageSucces = "Demande envoyée. Le groupe va voter. 🙏"
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                dialogueDemandeSekouOuvert = false
+            }
+        }
+    }
+
+    /** Vote pour ou contre une demande de secours. */
+    fun voterSekou(demandeId: String, pour: Boolean) {
+        viewModelScope.launch {
+            try {
+                fonSekou = Network.api.voterSekou(demandeId, VoterSekouRequest(pour))
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            }
+        }
+    }
+
+    /** Cloture une demande (Manman sol) : versement si le vote est favorable. */
+    fun cloturerSekou(demandeId: String) {
+        erreur = null
+        messageSucces = null
+        viewModelScope.launch {
+            try {
+                fonSekou = Network.api.cloturerSekou(demandeId)
+                messageSucces = "Demande clôturée."
+                chargerPortefeuille()
             } catch (e: Throwable) {
                 erreur = messageErreur(e)
             }

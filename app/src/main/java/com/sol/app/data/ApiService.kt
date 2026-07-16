@@ -92,6 +92,32 @@ interface ApiService {
     @GET("api/releve")
     suspend fun monReleve(): ReleveResponse
 
+    // ----- Fon Sekou (caisse de solidarité) -----
+
+    @GET("api/sols/{solId}/fon-sekou")
+    suspend fun fonSekou(@Path("solId") solId: String): FonSekouResponse
+
+    @POST("api/sols/{solId}/fon-sekou/contribuer")
+    suspend fun contribuerSekou(
+        @Path("solId") solId: String,
+        @Body body: ContribuerRequest,
+    ): FonSekouResponse
+
+    @POST("api/sols/{solId}/fon-sekou/demandes")
+    suspend fun demanderSekou(
+        @Path("solId") solId: String,
+        @Body body: DemanderSekouRequest,
+    ): FonSekouResponse
+
+    @POST("api/fon-sekou/demandes/{demandeId}/voter")
+    suspend fun voterSekou(
+        @Path("demandeId") demandeId: String,
+        @Body body: VoterSekouRequest,
+    ): FonSekouResponse
+
+    @POST("api/fon-sekou/demandes/{demandeId}/cloturer")
+    suspend fun cloturerSekou(@Path("demandeId") demandeId: String): FonSekouResponse
+
     @POST("api/messages/prive/{destinataireId}")
     suspend fun envoyerPrive(
         @Path("destinataireId") destinataireId: String,

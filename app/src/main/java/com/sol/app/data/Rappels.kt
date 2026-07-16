@@ -116,7 +116,9 @@ class RappelWorker(
 
             val (cotisation, date) = aRappeler.first()
             val nomSol = sols[cotisation.solId]?.nom ?: tr("un de tes Sols", "youn nan Sòl ou yo")
-            val montant = (cotisation.montantPaye ?: cotisation.montantAttendu).toLong()
+            // Un rappel concerne une cotisation NON payee : on affiche le montant
+            // attendu (montantPaye vaut 0 tant qu'elle n'est pas reglee).
+            val montant = cotisation.montantAttendu.toLong()
             val quand = when {
                 date.isBefore(aujourdHui) -> tr("est en retard", "an reta")
                 date.isEqual(aujourdHui) -> tr("est due aujourd'hui", "dwe jodi a")

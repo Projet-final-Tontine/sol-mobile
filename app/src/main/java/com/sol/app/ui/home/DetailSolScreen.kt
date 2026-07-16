@@ -745,6 +745,10 @@ fun EcranDetailSol(
             SectionSondages(vm)
             Spacer(Modifier.height(16.dp))
 
+            // ================= FON SEKOU (CAISSE DE SOLIDARITE) =================
+            SectionFonSekou(vm)
+            Spacer(Modifier.height(16.dp))
+
             // ================= TUILES D'ACTION =================
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TuileAction(
