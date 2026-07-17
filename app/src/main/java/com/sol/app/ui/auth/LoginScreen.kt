@@ -36,11 +36,15 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +61,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.android.gms.common.api.ApiException
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.sol.app.R
 import com.sol.app.data.Session
 
@@ -70,6 +79,54 @@ fun LoginScreen(
     var motDePasse by rememberSaveable { mutableStateOf("") }
     var motDePasseVisible by rememberSaveable { mutableStateOf(false) }
     var seSouvenir by rememberSaveable { mutableStateOf(Session.identifiantMemorise != null) }
+
+    // --- Flux « Continuer avec Google » (Google Sign-In -> Firebase -> backend) ---
+    val contexte = LocalContext.current
+    val clientGoogle = remember {
+        val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(contexte.getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        GoogleSignIn.getClient(contexte, options)
+    }
+    val lanceurGoogle = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { resultat ->
+        try {
+            val compte = GoogleSignIn.getSignedInAccountFromIntent(resultat.data)
+                .getResult(ApiException::class.java)
+            val idTokenGoogle = compte.idToken
+            if (idTokenGoogle == null) {
+                vm.signalerErreur("Impossible d'obtenir le jeton Google.")
+                return@rememberLauncherForActivityResult
+            }
+            // Échange le jeton Google contre une session Firebase, puis récupère
+            // le jeton d'identité Firebase à envoyer au backend.
+            val credential = GoogleAuthProvider.getCredential(idTokenGoogle, null)
+            FirebaseAuth.getInstance().signInWithCredential(credential)
+                .addOnCompleteListener { tache ->
+                    if (tache.isSuccessful) {
+                        FirebaseAuth.getInstance().currentUser
+                            ?.getIdToken(true)
+                            ?.addOnCompleteListener { t ->
+                                val jeton = t.result?.token
+                                if (jeton != null) vm.connexionGoogle(jeton, onConnecte)
+                                else vm.signalerErreur("Jeton Firebase manquant.")
+                            }
+                    } else {
+                        vm.signalerErreur("Échec de la connexion Google.")
+                    }
+                }
+        } catch (e: ApiException) {
+            vm.signalerErreur("Connexion Google annulée.")
+        }
+    }
+    val lancerGoogle: () -> Unit = {
+        // Déconnexion préalable pour toujours afficher le sélecteur de compte.
+        clientGoogle.signOut().addOnCompleteListener {
+            lanceurGoogle.launch(clientGoogle.signInIntent)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Image(
@@ -260,6 +317,53 @@ fun LoginScreen(
                             vm.connexion(telephone, motDePasse, onConnecte)
                         },
                     )
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Séparateur "ou" (à l'intérieur de la carte).
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                        )
+                        Text(
+                            "  ou  ",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.weight(1f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // Bouton « Continuer avec Google ».
+                    OutlinedButton(
+                        onClick = lancerGoogle,
+                        enabled = !vm.enChargement,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface,
+                        ),
+                    ) {
+                        Text(
+                            "G",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 18.sp,
+                            color = Color(0xFF4285F4),
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text("Continuer avec Google", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
 

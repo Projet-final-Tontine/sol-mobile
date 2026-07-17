@@ -74,6 +74,14 @@ fun AppNavigation() {
                 onInscrit = {
                     nav.navigate("login") { popUpTo("welcome") }
                 },
+                onConnecte = {
+                    nav.navigate("home") { popUpTo(0) }
+                },
+                onDejaInscrit = { email ->
+                    // E-mail déjà utilisé : on pré-remplit la connexion et on y va.
+                    Session.identifiantMemorise = email
+                    nav.navigate("login") { popUpTo("welcome") }
+                },
                 onRetour = { nav.popBackStack() },
             )
         }

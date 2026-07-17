@@ -445,51 +445,61 @@ private fun OngletAccueil(
 
         Spacer(Modifier.height(20.dp))
 
-        // Carte solde total
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    tr("Solde Total d'Épargne", "Total Ekonomi ou"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        // Carte solde total — style « carte bancaire » premium.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(24.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF6C4EE8), Color(0xFF3A22A8), Color(0xFF241562))
+                    )
                 )
-                Spacer(Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                .padding(22.dp),
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        "%,.2f HTG".format(vm.soldeTotal),
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        tr("Solde Total d'Épargne", "Total Ekonomi ou"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.85f),
                         modifier = Modifier.weight(1f),
                     )
-                    CourbeActivite()
+                    Text("💳", fontSize = 22.sp)
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "%,.2f HTG".format(vm.soldeTotal),
+                    fontSize = 34.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                )
+                Spacer(Modifier.height(16.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        if (vm.cotisations.isEmpty()) "Vos cotisations apparaîtront ici"
-                        else "${vm.cotisations.size} cotisation(s) au total",
+                        if (vm.cotisations.isEmpty())
+                            tr("Vos cotisations apparaîtront ici", "Kotizasyon ou yo ap parèt la")
+                        else "${vm.cotisations.size} " + tr("cotisation(s) au total", "kotizasyon antou"),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color.White.copy(alpha = 0.8f),
                     )
                     Text(
-                        tr("Détails de l'Activité ›", "Detay Aktivite ›"),
+                        tr("Détails ›", "Detay ›"),
                         style = MaterialTheme.typography.bodySmall,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = Color.White,
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.White.copy(alpha = 0.18f))
                             .clickable { onVoirActivite() }
-                            .padding(4.dp),
+                            .padding(horizontal = 12.dp, vertical = 6.dp),
                     )
                 }
             }

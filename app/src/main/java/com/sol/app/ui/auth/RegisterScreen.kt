@@ -1,6 +1,7 @@
 package com.sol.app.ui.auth
 
 import android.util.Patterns
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,6 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -84,9 +86,12 @@ import java.util.TimeZone
 @Composable
 fun RegisterScreen(
     onInscrit: () -> Unit,
+    onConnecte: () -> Unit,
+    onDejaInscrit: (String) -> Unit,
     onRetour: () -> Unit,
     vm: AuthViewModel = viewModel(),
 ) {
+    val contexteRegister = LocalContext.current
     var nom by rememberSaveable { mutableStateOf("") }
     var prenom by rememberSaveable { mutableStateOf("") }
     var sexe by rememberSaveable { mutableStateOf("M") }
@@ -427,10 +432,44 @@ fun RegisterScreen(
                         dateNaissance = dateNaissance,
                         motDePasse = motDePasse,
                     ),
-                    onInscrit,
+                    onSucces = onInscrit,
+                    onEmailDejaUtilise = { emailExistant ->
+                        Toast.makeText(
+                            contexteRegister,
+                            "Ce compte existe déjà. Connectez-vous.",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        onDejaInscrit(emailExistant)
+                    },
                 )
             },
         )
+
+        Spacer(Modifier.height(14.dp))
+
+        // Séparateur "ou" + connexion Google (crée le compte ou connecte).
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+            )
+            Text(
+                "  ou  ",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            HorizontalDivider(
+                modifier = Modifier.weight(1f),
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        BoutonGoogle(vm = vm, onConnecte = onConnecte)
 
         TextButton(
             onClick = onRetour,

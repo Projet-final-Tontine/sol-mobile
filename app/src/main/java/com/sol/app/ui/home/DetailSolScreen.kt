@@ -559,46 +559,15 @@ fun EcranDetailSol(
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(14.dp))
 
-                // Grand compteur + stepper horizontal (chemin des tours).
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(
-                        "$courant",
-                        fontSize = 40.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TexteBlanc,
-                        maxLines = 1,
+                // Anneau de progression du cycle (compteur au centre).
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    StepperCycle(
+                        total = total,
+                        courant = courant,
+                        clotures = detail?.toursJoues ?: 0,
                     )
-                    Text(
-                        " / $total " + tr("tours", "tou"),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TexteMuet,
-                        maxLines = 1,
-                        modifier = Modifier.padding(bottom = 7.dp),
-                    )
-                }
-
-                Spacer(Modifier.height(18.dp))
-
-                StepperCycle(
-                    total = total,
-                    courant = courant,
-                    clotures = detail?.toursJoues ?: 0,
-                )
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    LegendePoint(MagentaAnneau, tr("Terminé", "Fini"))
-                    Spacer(Modifier.width(16.dp))
-                    LegendePoint(BleuAnneau, tr("En cours", "K ap fèt"))
-                    Spacer(Modifier.width(16.dp))
-                    LegendePoint(Color(0xFF4A4370), tr("À venir", "K ap vini"))
                 }
 
                 Spacer(Modifier.height(18.dp))
@@ -1028,92 +997,47 @@ private fun CarteStat(
 }
 
 /**
- * Stepper horizontal du cycle : une pastille numerotee par tour, reliees par
- * une barre qui se remplit (degrade magenta -> bleu, animee). Le tour en cours
- * est mis en avant (couronne + anneau lumineux). Design fintech moderne.
+ * Anneau de progression du cycle : un cercle qui se remplit selon les tours
+ * accomplis, avec le tour en cours (couronne) et le total affiches au centre.
+ * Design moderne, elegant — remplace l'ancienne ligne horizontale.
  */
 @Composable
 private fun StepperCycle(total: Int, courant: Int, clotures: Int) {
-    val n = total.coerceIn(1, 12)
-    val progression = if (n <= 1) (if (courant >= 1) 1f else 0f)
-    else ((courant - 1).coerceIn(0, n - 1)).toFloat() / (n - 1)
-    val progressionAnimee by animateFloatAsState(
-        targetValue = progression,
-        animationSpec = tween(durationMillis = 800),
-        label = "stepper",
+    val n = total.coerceAtLeast(1)
+    val faits = maxOf(courant - 1, clotures).coerceIn(0, n)
+    val cible = faits.toFloat() / n
+    val progression by animateFloatAsState(
+        targetValue = cible,
+        animationSpec = tween(durationMillis = 900),
+        label = "anneau",
     )
-
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // 1) La barre de fond + la barre remplie, centrees verticalement.
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 15.dp)
-                .align(Alignment.Center),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Color(0xFF2A2350)),
+    Box(
+        modifier = Modifier.size(170.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        CircularProgressIndicator(
+            progress = { progression },
+            modifier = Modifier.fillMaxSize(),
+            color = BleuAnneau,
+            trackColor = Color(0xFF2A2350),
+            strokeWidth = 14.dp,
+        )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (courant >= 1) Text("👑", fontSize = 20.sp)
+            Text(
+                "$courant",
+                fontSize = 46.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = TexteBlanc,
+                maxLines = 1,
             )
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progressionAnimee)
-                    .height(5.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(
-                        Brush.horizontalGradient(listOf(MagentaAnneau, BleuAnneau))
-                    ),
+            Text(
+                tr("sur $total tours", "sou $total tou"),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TexteMuet,
+                maxLines = 1,
             )
-        }
-
-        // 2) Les pastilles numerotees, reparties sur toute la largeur.
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            for (i in 1..n) {
-                val etatFait = i < courant || i <= clotures
-                val etatCourant = i == courant
-                val (fond, encre) = when {
-                    etatFait -> MagentaAnneau to Color.White
-                    etatCourant -> BleuAnneau to Color.White
-                    else -> Color(0xFF39325E) to TexteMuet
-                }
-                Box(contentAlignment = Alignment.Center) {
-                    // Anneau lumineux sous la pastille du tour en cours.
-                    if (etatCourant) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(BleuAnneau.copy(alpha = 0.25f)),
-                        )
-                    }
-                    Box(
-                        modifier = Modifier
-                            .size(if (etatCourant) 34.dp else 30.dp)
-                            .clip(CircleShape)
-                            .background(fond)
-                            .border(3.dp, Color(0xFF14102A), CircleShape),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("$i", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = encre)
-                    }
-                    if (etatCourant) {
-                        Text(
-                            "👑",
-                            fontSize = 15.sp,
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .offset(y = (-20).dp),
-                        )
-                    }
-                }
-            }
         }
     }
 }

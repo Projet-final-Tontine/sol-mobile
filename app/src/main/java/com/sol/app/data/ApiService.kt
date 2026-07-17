@@ -21,6 +21,10 @@ interface ApiService {
     @POST("api/auth/connexion")
     suspend fun connexion(@Body body: ConnexionRequest): ConnexionResponse
 
+    /** Connexion « Continuer avec Google » (jeton Firebase vérifié côté serveur). */
+    @POST("api/auth/google")
+    suspend fun connexionGoogle(@Body body: GoogleAuthRequest): ConnexionResponse
+
     @GET("api/sols/mes-sols")
     suspend fun mesSols(): List<SolResponse>
 

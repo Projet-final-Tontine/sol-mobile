@@ -20,6 +20,11 @@ data class ConnexionRequest(
     val motDePasse: String,
 )
 
+/** Requête « Continuer avec Google » : le jeton d'identité Firebase. */
+data class GoogleAuthRequest(
+    val idToken: String,
+)
+
 data class UtilisateurResponse(
     val id: String,
     val nom: String,

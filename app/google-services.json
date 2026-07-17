@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "785013762529",
+    "project_id": "sol-en-ligne",
+    "storage_bucket": "sol-en-ligne.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:785013762529:android:781c8fc5ab19eb71294aa0",
+        "android_client_info": {
+          "package_name": "com.sol.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "785013762529-d8qnqros2ps0e3uodeltf86d3uu40mhn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sol.app",
+            "certificate_hash": "069cfc27d22bd5f087035d38163c05879ff5c743"
+          }
+        },
+        {
+          "client_id": "785013762529-njd2qgp2abvlp05nadglm1dqhoveor0n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoseZluWUjgFFMEiJtoM6uIjj_4byk230"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "785013762529-njd2qgp2abvlp05nadglm1dqhoveor0n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
