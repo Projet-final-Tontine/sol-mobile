@@ -16,16 +16,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -66,14 +76,15 @@ private data class MoyenPaiement(
     val nomLogo: String?,     // nom du drawable officiel (ou null pour l'icone)
     val couleur: Color,       // couleur de marque (repere de secours)
     val emoji: String,        // repere de secours si le logo n'est pas fourni
+    val code: String? = null, // code envoye au backend (MONCASH, NATCASH, VISA...)
     val estFiche: Boolean = false,
 )
 
 private fun moyensDepot(): List<MoyenPaiement> = listOf(
-    MoyenPaiement("MonCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_moncash", Color(0xFFC8102E), "📱"),
-    MoyenPaiement("NatCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_natcash", Color(0xFF009639), "📱"),
-    MoyenPaiement("Visa", tr("Carte bancaire", "Kat bankè"), "logo_visa", Color(0xFF1A1F71), "💳"),
-    MoyenPaiement("Mastercard", tr("Carte bancaire", "Kat bankè"), "logo_mastercard", Color(0xFFEB001B), "💳"),
+    MoyenPaiement("MonCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_moncash", Color(0xFFC8102E), "📱", "MONCASH"),
+    MoyenPaiement("NatCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_natcash", Color(0xFF009639), "📱", "NATCASH"),
+    MoyenPaiement("Visa", tr("Carte bancaire", "Kat bankè"), "logo_visa", Color(0xFF1A1F71), "💳", "VISA"),
+    MoyenPaiement("Mastercard", tr("Carte bancaire", "Kat bankè"), "logo_mastercard", Color(0xFFEB001B), "💳", "MASTERCARD"),
     MoyenPaiement(
         tr("Fiche de paie / reçu", "Fich pèman / resi"),
         tr("Dépôt en banque — à confirmer", "Depo labank — pou konfime"),
@@ -82,12 +93,12 @@ private fun moyensDepot(): List<MoyenPaiement> = listOf(
 )
 
 private fun moyensRetrait(): List<MoyenPaiement> = listOf(
-    MoyenPaiement("MonCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_moncash", Color(0xFFC8102E), "📱"),
-    MoyenPaiement("NatCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_natcash", Color(0xFF009639), "📱"),
+    MoyenPaiement("MonCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_moncash", Color(0xFFC8102E), "📱", "MONCASH"),
+    MoyenPaiement("NatCash", tr("Portefeuille mobile", "Pòtfèy mobil"), "logo_natcash", Color(0xFF009639), "📱", "NATCASH"),
     MoyenPaiement(
         tr("Compte bancaire", "Kont labank"),
-        tr("Virement — bientôt", "Vireman — byento"),
-        null, Color(0xFF3B82F6), "🏦",
+        tr("Virement bancaire", "Vireman labank"),
+        null, Color(0xFF3B82F6), "🏦", "VIREMENT",
     ),
 )
 
@@ -99,7 +110,7 @@ private fun moyensRetrait(): List<MoyenPaiement> = listOf(
 @Composable
 fun DialogueMoyensPaiement(
     type: String,                       // "DEPOT" ou "RETRAIT"
-    onBientot: (String) -> Unit,
+    onMoyen: (String) -> Unit,          // code du moyen choisi (MONCASH, VISA...)
     onFiche: () -> Unit,
     onFermer: () -> Unit,
 ) {
@@ -142,7 +153,10 @@ fun DialogueMoyensPaiement(
 
             moyens.forEach { moyen ->
                 LigneMoyen(moyen) {
-                    if (moyen.estFiche) onFiche() else onBientot(moyen.nom)
+                    when {
+                        moyen.estFiche -> onFiche()
+                        moyen.code != null -> onMoyen(moyen.code)
+                    }
                 }
                 Spacer(Modifier.height(10.dp))
             }
@@ -313,6 +327,157 @@ fun DialogueFichePaie(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+        }
+    }
+}
+
+// ============================================================================
+//  PASSERELLE DE PAIEMENT — saisie du montant puis verification au retour.
+// ============================================================================
+
+private fun nomMoyen(code: String): String = when (code) {
+    "MONCASH" -> "MonCash"
+    "NATCASH" -> "NatCash"
+    "VISA" -> "Visa"
+    "MASTERCARD" -> "Mastercard"
+    "VIREMENT" -> tr("Virement bancaire", "Vireman labank")
+    else -> code
+}
+
+private fun couleurMoyen(code: String): Color = when (code) {
+    "MONCASH" -> Color(0xFFC8102E)
+    "NATCASH" -> Color(0xFF009639)
+    "VISA" -> Color(0xFF1A1F71)
+    "MASTERCARD" -> Color(0xFFEB001B)
+    "VIREMENT" -> Color(0xFF2563EB)
+    else -> AccentMoyen
+}
+
+/** Saisie du montant avant d'ouvrir la page de paiement de marque. */
+@Composable
+fun DialogueMontantPaiement(
+    sens: String,      // "DEPOT" ou "RETRAIT"
+    moyen: String,     // MONCASH, NATCASH, VISA, MASTERCARD, VIREMENT
+    enCours: Boolean,
+    onValider: (Double) -> Unit,
+    onFermer: () -> Unit,
+) {
+    var montant by remember { mutableStateOf("") }
+    val estDepot = sens == "DEPOT"
+    val valide = montant.toDoubleOrNull()?.let { it > 0 } == true
+    val accent = couleurMoyen(moyen)
+
+    Dialog(onDismissRequest = onFermer, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(FondMoyens)
+                .padding(22.dp),
+        ) {
+            Text(
+                if (estDepot) tr("Déposer via ", "Depoze via ") + nomMoyen(moyen)
+                else tr("Retirer via ", "Retire via ") + nomMoyen(moyen),
+                color = TexteMoyen,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+            )
+            Text(
+                tr("Entrez le montant en gourdes (HTG)", "Antre montan an an goud (HTG)"),
+                color = TexteMoyenDoux,
+                fontSize = 13.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+            OutlinedTextField(
+                value = montant,
+                onValueChange = { saisie -> montant = saisie.filter { it.isDigit() }.take(9) },
+                label = { Text(tr("Montant", "Montan")) },
+                suffix = { Text("HTG", color = TexteMoyenDoux) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = TexteMoyen,
+                    unfocusedTextColor = TexteMoyen,
+                    focusedBorderColor = accent,
+                    unfocusedBorderColor = TexteMoyenDoux,
+                    cursorColor = accent,
+                    focusedLabelColor = accent,
+                    unfocusedLabelColor = TexteMoyenDoux,
+                ),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = { montant.toDoubleOrNull()?.let { onValider(it) } },
+                enabled = valide && !enCours,
+                colors = ButtonDefaults.buttonColors(containerColor = accent),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+            ) {
+                if (enCours) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+                } else {
+                    Text(tr("Continuer", "Kontinye"), color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+            TextButton(onClick = onFermer, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Annuler", "Anile"), color = TexteMoyenDoux)
+            }
+        }
+    }
+}
+
+/** Au retour du navigateur : bouton pour vérifier que le paiement est confirmé. */
+@Composable
+fun DialogueVerifierPaiement(
+    enCours: Boolean,
+    onRouvrir: () -> Unit,
+    onVerifier: () -> Unit,
+    onFermer: () -> Unit,
+) {
+    Dialog(onDismissRequest = onFermer, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(FondMoyens)
+                .padding(22.dp),
+        ) {
+            Text(
+                tr("Finalisez votre paiement", "Fini peman ou"),
+                color = TexteMoyen,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                tr(
+                    "Une page de paiement s'est ouverte dans votre navigateur. Terminez-la, puis revenez ici et appuyez sur « Vérifier ».",
+                    "Yon paj peman louvri nan navigatè ou. Fini l, epi tounen isit la peze « Verifye ».",
+                ),
+                color = TexteMoyenDoux,
+                fontSize = 14.sp,
+            )
+            Spacer(Modifier.height(20.dp))
+            Button(
+                onClick = onVerifier,
+                enabled = !enCours,
+                colors = ButtonDefaults.buttonColors(containerColor = AccentMoyen),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+            ) {
+                if (enCours) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+                } else {
+                    Text(tr("J'ai payé — Vérifier", "Mwen peye — Verifye"), color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+            TextButton(onClick = onRouvrir, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Rouvrir la page de paiement", "Rouvri paj peman an"), color = TexteMoyen)
+            }
+            TextButton(onClick = onFermer, modifier = Modifier.fillMaxWidth()) {
+                Text(tr("Annuler", "Anile"), color = TexteMoyenDoux)
             }
         }
     }

@@ -324,6 +324,54 @@ data class ReleveResponse(
     val urlVerification: String,
 )
 
+// ----- Passerelle de paiement (dépôt / retrait via MonCash, NatCash, cartes) -----
+
+/** Demande d'initialisation d'un paiement. */
+data class InitierPaiementRequest(
+    val sens: String,     // DEPOT ou RETRAIT
+    val moyen: String,    // MONCASH, NATCASH, VISA, MASTERCARD, VIREMENT
+    val montant: Double,
+)
+
+/** Réponse : l'app ouvre redirectUrl dans le navigateur pour finaliser. */
+data class InitierPaiementResponse(
+    val orderId: String,
+    val reference: String,
+    val redirectUrl: String,
+    val statut: String,
+)
+
+/** État d'un ordre de paiement (interrogé au retour du navigateur). */
+data class StatutPaiementResponse(
+    val orderId: String,
+    val sens: String,
+    val moyen: String,
+    val montant: Double,
+    val statut: String,   // EN_ATTENTE, PAYE, ECHOUE
+    val reference: String,
+)
+
+/** Un bloc du Registre Inviolable (grand livre à hash chaîné). */
+data class BlocRegistreResponse(
+    val position: Long,
+    val date: String?,
+    val type: String,           // DEPOT, COTISATION, GAIN_MAIN, FON_SEKOU…
+    val sens: String,           // CREDIT, DEBIT
+    val montant: Double,
+    val description: String?,
+    val hash: String,
+    val hashPrecedent: String,
+)
+
+/** Résultat de la vérification d'intégrité du Registre Inviolable. */
+data class VerificationRegistreResponse(
+    val intacte: Boolean,
+    val nombreBlocs: Long,
+    val positionRupture: Long?,   // null si la chaîne est intègre
+    val empreinteGlobale: String?,
+    val message: String,
+)
+
 /** Message récent destiné à l'utilisateur (pour les notifications). */
 data class MessageRecentResponse(
     val expediteurNom: String?,

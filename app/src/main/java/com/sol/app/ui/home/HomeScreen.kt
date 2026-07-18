@@ -313,18 +313,49 @@ fun HomeScreen(
     vm.moyensType?.let { type ->
         DialogueMoyensPaiement(
             type = type,
-            onBientot = { nom ->
-                vm.fermerMoyens()
-                vm.montrerBientot(
-                    tr(
-                        "« $nom » sera bientôt disponible. Le lien de paiement arrive prochainement. 💳",
-                        "« $nom » ap disponib byento. Lyen pèman an ap vini talè. 💳",
-                    )
-                )
-            },
+            onMoyen = { moyen -> vm.choisirMoyen(moyen) },
             onFiche = { vm.ouvrirFiche() },
             onFermer = { vm.fermerMoyens() },
         )
+    }
+
+    // Saisie du montant, puis ouverture de la page de paiement dans le navigateur.
+    if (vm.dialogueMontantOuvert && vm.paiementSens != null && vm.paiementMoyen != null) {
+        DialogueMontantPaiement(
+            sens = vm.paiementSens!!,
+            moyen = vm.paiementMoyen!!,
+            enCours = vm.paiementEnCours,
+            onValider = { montant -> vm.lancerPaiement(montant) },
+            onFermer = { vm.annulerMontant() },
+        )
+    }
+
+    // Verification du paiement au retour du navigateur.
+    if (vm.dialogueVerifierOuvert) {
+        DialogueVerifierPaiement(
+            enCours = vm.verificationEnCours,
+            onRouvrir = { vm.rouvrirPagePaiement() },
+            onVerifier = { vm.verifierPaiement() },
+            onFermer = { vm.fermerVerification() },
+        )
+    }
+
+    // Ouvre la page de paiement dans le navigateur quand l'URL est prete.
+    val contextePaiement = androidx.compose.ui.platform.LocalContext.current
+    androidx.compose.runtime.LaunchedEffect(vm.urlPaiementAOuvrir) {
+        vm.urlPaiementAOuvrir?.let { url ->
+            try {
+                contextePaiement.startActivity(
+                    android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse(url),
+                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            } catch (_: Throwable) {
+                // Navigateur indisponible : l'utilisateur pourra reessayer.
+            }
+            vm.urlPaiementConsommee()
+        }
     }
 
     if (vm.ficheOuvert) {

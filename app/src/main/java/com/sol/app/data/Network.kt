@@ -8,6 +8,7 @@ import retrofit2.HttpException
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 /** Configuration reseau : Retrofit + jeton JWT automatique. */
 object Network {
@@ -27,6 +28,11 @@ object Network {
         .addInterceptor(
             HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY }
         )
+        // Delais plus larges : au 1er login Google, le serveur telecharge les cles
+        // Google pour verifier le jeton, ce qui peut depasser les 10 s par defaut.
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
     val api: ApiService = Retrofit.Builder()

@@ -92,6 +92,7 @@ fun ProfilScreen(
     var dialogueLangueOuvert by remember { mutableStateOf(false) }
     var dialogueThemeOuvert by remember { mutableStateOf(false) }
     var montrerReleve by remember { mutableStateOf(false) }
+    var montrerRegistre by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { vm.chargerFiabilite() }
 
@@ -312,6 +313,33 @@ fun ProfilScreen(
                     tr(
                         "Un certificat officiel de votre ponctualité, vérifiable par une banque.",
                         "Yon sètifika ofisyèl sou jan ou peye alè, yon bank ka verifye l.",
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // 3c. Registre Inviolable (grand livre à hash chaîné)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Column(modifier = Modifier.padding(bottom = 8.dp)) {
+                LigneAction(
+                    icone = { Icon(Icons.Default.VerifiedUser, null, tint = MaterialTheme.colorScheme.primary) },
+                    titre = tr("Registre Inviolable", "Rejis Enfalsifyab"),
+                    onClick = { montrerRegistre = true },
+                )
+                Text(
+                    tr(
+                        "Le grand livre scellé de toutes les transactions : aucune ne peut être falsifiée.",
+                        "Gran liv sele tout tranzaksyon yo : pèsonn pa ka falsifye yo.",
                     ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -570,6 +598,15 @@ fun ProfilScreen(
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
         ) {
             EcranReleve(onFermer = { montrerReleve = false })
+        }
+    }
+
+    if (montrerRegistre) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { montrerRegistre = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            EcranRegistre(onFermer = { montrerRegistre = false })
         }
     }
 

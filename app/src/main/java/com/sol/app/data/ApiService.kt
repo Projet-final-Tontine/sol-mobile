@@ -96,6 +96,16 @@ interface ApiService {
     @GET("api/releve")
     suspend fun monReleve(): ReleveResponse
 
+    // ----- Registre Inviolable (grand livre à hash chaîné) -----
+
+    /** Liste des blocs scellés (du plus récent au plus ancien). */
+    @GET("api/registre")
+    suspend fun registre(): List<BlocRegistreResponse>
+
+    /** Vérifie l'intégrité de toute la chaîne (badge « inviolable »). */
+    @GET("api/registre/verifier")
+    suspend fun verifierRegistre(): VerificationRegistreResponse
+
     // ----- Fon Sekou (caisse de solidarité) -----
 
     @GET("api/sols/{solId}/fon-sekou")
@@ -142,6 +152,16 @@ interface ApiService {
 
     @POST("api/portefeuille/depot")
     suspend fun deposer(@Body body: DepotRequest): PortefeuilleResponse
+
+    // ----- Passerelle de paiement (dépôt / retrait) -----
+
+    /** Crée un ordre de paiement ; l'app ouvrira l'URL renvoyée dans le navigateur. */
+    @POST("api/portefeuille/paiement/initier")
+    suspend fun initierPaiement(@Body body: InitierPaiementRequest): InitierPaiementResponse
+
+    /** État de l'ordre de paiement (interrogé au retour dans l'app). */
+    @GET("api/portefeuille/paiement/statut/{orderId}")
+    suspend fun statutPaiement(@Path("orderId") orderId: String): StatutPaiementResponse
 
     @POST("api/cotisations/{cotisationId}/payer")
     suspend fun payerCotisation(

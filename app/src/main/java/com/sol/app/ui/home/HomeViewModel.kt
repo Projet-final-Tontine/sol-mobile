@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sol.app.data.ContribuerRequest
 import com.sol.app.data.CotisationResponse
+import com.sol.app.data.InitierPaiementRequest
 import com.sol.app.data.CreerSolRequest
 import com.sol.app.data.DemanderSekouRequest
 import com.sol.app.data.FonSekouResponse
@@ -147,6 +148,111 @@ class HomeViewModel : ViewModel() {
     fun fermerMoyens() { moyensType = null }
     fun ouvrirFiche() { moyensType = null; ficheOuvert = true }
     fun fermerFiche() { ficheOuvert = false }
+
+    // ----- Passerelle de paiement (dépôt / retrait via navigateur) -----
+
+    // Moyen choisi, en attente du montant : sens (DEPOT/RETRAIT) + moyen.
+    var paiementSens by mutableStateOf<String?>(null)
+        private set
+    var paiementMoyen by mutableStateOf<String?>(null)
+        private set
+    var dialogueMontantOuvert by mutableStateOf(false)
+        private set
+    var paiementEnCours by mutableStateOf(false)
+        private set
+    // URL à ouvrir dans le navigateur (l'écran l'observe puis la consomme).
+    var urlPaiementAOuvrir by mutableStateOf<String?>(null)
+        private set
+    // Ordre en attente de vérification au retour du navigateur.
+    var orderIdEnCours by mutableStateOf<String?>(null)
+        private set
+    var dialogueVerifierOuvert by mutableStateOf(false)
+        private set
+    var verificationEnCours by mutableStateOf(false)
+        private set
+
+    /** L'utilisateur a choisi un moyen : on demande le montant. */
+    fun choisirMoyen(moyen: String) {
+        paiementSens = moyensType
+        paiementMoyen = moyen
+        moyensType = null
+        dialogueMontantOuvert = true
+    }
+
+    fun annulerMontant() {
+        dialogueMontantOuvert = false
+        paiementSens = null
+        paiementMoyen = null
+    }
+
+    /** Crée l'ordre de paiement et prépare l'ouverture de la page web. */
+    fun lancerPaiement(montant: Double) {
+        val sens = paiementSens ?: return
+        val moyen = paiementMoyen ?: return
+        erreur = null
+        messageSucces = null
+        paiementEnCours = true
+        viewModelScope.launch {
+            try {
+                val rep = Network.api.initierPaiement(
+                    InitierPaiementRequest(sens, moyen, montant)
+                )
+                orderIdEnCours = rep.orderId
+                // On ouvre l'URL sur le domaine que l'app utilise déjà (joignable
+                // depuis le téléphone), pas le localhost renvoyé par le serveur.
+                urlPaiementAOuvrir = Network.BASE_URL.trimEnd('/') + "/pay/" + rep.orderId
+                dialogueMontantOuvert = false
+                dialogueVerifierOuvert = true
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                paiementEnCours = false
+            }
+        }
+    }
+
+    /** L'écran a ouvert le navigateur : on efface l'URL pour ne pas la rouvrir. */
+    fun urlPaiementConsommee() { urlPaiementAOuvrir = null }
+
+    /** Rouvre la page de paiement (bouton « Rouvrir la page »). */
+    fun rouvrirPagePaiement() {
+        val id = orderIdEnCours ?: return
+        urlPaiementAOuvrir = Network.BASE_URL.trimEnd('/') + "/pay/" + id
+    }
+
+    /** Vérifie l'état du paiement au retour du navigateur. */
+    fun verifierPaiement() {
+        val id = orderIdEnCours ?: return
+        erreur = null
+        verificationEnCours = true
+        viewModelScope.launch {
+            try {
+                val etat = Network.api.statutPaiement(id)
+                if (etat.statut == "PAYE") {
+                    val estDepot = etat.sens == "DEPOT"
+                    messageSucces = if (estDepot)
+                        "Dépôt de ${etat.montant.toInt()} HTG confirmé ! ✅"
+                    else
+                        "Retrait de ${etat.montant.toInt()} HTG confirmé ! ✅"
+                    chargerPortefeuille()
+                    fermerVerification()
+                } else {
+                    erreur = "Paiement pas encore confirmé. Terminez le paiement puis réessayez."
+                }
+            } catch (e: Throwable) {
+                erreur = messageErreur(e)
+            } finally {
+                verificationEnCours = false
+            }
+        }
+    }
+
+    fun fermerVerification() {
+        dialogueVerifierOuvert = false
+        orderIdEnCours = null
+        paiementSens = null
+        paiementMoyen = null
+    }
 
     /**
      * Televerse la fiche de paie / le recu d'un depot bancaire. Le fichier est
