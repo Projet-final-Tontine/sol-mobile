@@ -8,11 +8,32 @@ data class InscriptionRequest(
     val sexe: String,
     val telephone: String,
     val email: String,
+    val username: String,
     val adresse: String,
     val cinNif: String,
     val dateNaissance: String, // format AAAA-MM-JJ
     val motDePasse: String,
     val role: String = "MEMBRE",
+)
+
+// ----- Annuaire public (username, recherche, transfert) -----
+
+data class DisponibiliteResponse(val disponible: Boolean, val message: String)
+data class MajUsernameRequest(val username: String)
+
+/** Résultat de recherche d'un bénéficiaire (avant un transfert). */
+data class RechercheUtilisateurResponse(
+    val id: String,
+    val username: String?,
+    val nomComplet: String?,
+    val photoUrl: String?,
+    val kycVerifie: Boolean,
+)
+
+data class TransfertRequest(
+    val beneficiaire: String,   // username (@...) ou e-mail
+    val montant: Double,
+    val note: String?,
 )
 
 data class ConnexionRequest(
@@ -31,6 +52,7 @@ data class UtilisateurResponse(
     val prenom: String,
     val telephone: String,
     val email: String,
+    val username: String?,
     val photoUrl: String?,
     val role: String,
     val statut: String,
@@ -119,6 +141,34 @@ data class ModifierProfilRequest(
 data class ChangerMotDePasseRequest(
     val ancienMotDePasse: String,
     val nouveauMotDePasse: String,
+)
+
+// ----- Vérification d'identité (KYC) -----
+
+/** État courant du KYC : identité pré-remplie + statut de vérification. */
+data class KycEtatResponse(
+    val nom: String?,
+    val prenom: String?,
+    val dateNaissance: String?,   // AAAA-MM-JJ
+    val adresse: String?,
+    val statut: String,           // NON_SOUMIS, SOUMIS, APPROUVE, REJETE
+    val typeDocument: String?,
+    val dateSoumission: String?,
+)
+
+/** Étape 1 : confirmation/correction de l'identité. */
+data class MajIdentiteRequest(
+    val nom: String?,
+    val prenom: String?,
+    val dateNaissance: String?,
+    val adresse: String?,
+)
+
+/** Étape finale : soumission des documents. */
+data class SoumettreKycRequest(
+    val typeDocument: String,     // CARTE_IDENTITE, PASSEPORT, PERMIS
+    val rectoUrl: String,
+    val versoUrl: String?,
 )
 
 // ----- Portefeuille (wallet) -----
@@ -323,6 +373,22 @@ data class ReleveResponse(
     val hash: String,
     val urlVerification: String,
 )
+
+// ----- Tableau de bord « Mon activité » (accueil) -----
+
+data class TableauDeBordResponse(
+    val soldePortefeuille: Double,
+    val totalCotise: Double,
+    val totalARecevoir: Double,
+    val nbSolsActifs: Int,
+    val prochaineEcheance: EcheanceInfo?,   // null si rien à payer
+    val prochaineMain: MainInfo?,           // null si aucune main à venir
+    val epargne: List<PointEpargneInfo>,
+)
+
+data class EcheanceInfo(val date: String?, val montant: Double, val solNom: String?)
+data class MainInfo(val date: String?, val montant: Double, val solNom: String?)
+data class PointEpargneInfo(val date: String?, val cumul: Double)
 
 // ----- Passerelle de paiement (dépôt / retrait via MonCash, NatCash, cartes) -----
 

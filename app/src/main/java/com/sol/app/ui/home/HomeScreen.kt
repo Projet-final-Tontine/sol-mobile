@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
@@ -248,6 +249,7 @@ fun HomeScreen(
                             vm,
                             onVoirTontines = { onglet = 1 },
                             onVoirActivite = { onglet = 2 },
+                            onVerifierKyc = { onglet = 3 },
                         )
                         1 -> OngletTontines(vm)
                         2 -> OngletTransferts(vm)
@@ -279,11 +281,9 @@ fun HomeScreen(
             solde = vm.solde,
             onPayer = { vm.payerCotisationDepuisWallet() },
             onDeposer = {
+                // Solde insuffisant : on ouvre directement le vrai dépôt.
                 vm.annulerPaiement()
-                vm.montrerBientot(
-                    "Le dépôt sera disponible avec l'intégration de Mon Cash. " +
-                        "Cette fonctionnalité arrive bientôt."
-                )
+                vm.ouvrirMoyens("DEPOT")
             },
             onAnnuler = { vm.annulerPaiement() },
         )
@@ -402,6 +402,7 @@ private fun OngletAccueil(
     vm: HomeViewModel,
     onVoirTontines: () -> Unit,
     onVoirActivite: () -> Unit,
+    onVerifierKyc: () -> Unit,
 ) {
     FondLogin {
         Column(
@@ -474,6 +475,43 @@ private fun OngletAccueil(
         }
         } // fin du ruban
 
+        // Rappel KYC : bannière tant que l'identité n'est pas vérifiée.
+        if (vm.kycStatut != "APPROUVE") {
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFB8860B))
+                    .clickable { onVerifierKyc() }
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("🪪", fontSize = 24.sp)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (vm.kycStatut == "SOUMIS")
+                            tr("Vérification en cours", "Verifikasyon ap fèt")
+                        else tr("Vérifie ton identité", "Verifye idantite ou"),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        if (vm.kycStatut == "SOUMIS")
+                            tr("Ton dossier est en cours d'examen.", "Dosye ou an ap egzamine.")
+                        else tr("Requis pour sécuriser tes dépôts et retraits.",
+                            "Obligatwa pou sekirize depo ak retrè ou yo."),
+                        color = Color.White.copy(alpha = 0.9f),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (vm.kycStatut != "SOUMIS") {
+                    Text("›", color = Color.White, fontSize = 24.sp)
+                }
+            }
+        }
+
         Spacer(Modifier.height(20.dp))
 
         // Carte solde total — style « carte bancaire » premium.
@@ -535,6 +573,11 @@ private fun OngletAccueil(
                 }
             }
         }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Tableau de bord « Mon activité » : indicateurs, projection, courbe.
+        SectionTableauDeBord(vm)
 
         Spacer(Modifier.height(24.dp))
 
@@ -1302,6 +1345,7 @@ private fun InfoColonne(label: String, valeur: String) {
 private fun OngletTransferts(vm: HomeViewModel) {
     val aPayer = vm.cotisations.filter { !it.statut.equals("VALIDE", ignoreCase = true) }
     val transactions = vm.portefeuille?.transactions ?: emptyList()
+    var montrerEnvoi by remember { mutableStateOf(false) }
 
     FondLogin {
     Column(
@@ -1359,12 +1403,19 @@ private fun OngletTransferts(vm: HomeViewModel) {
                         modifier = Modifier.weight(1f),
                         onClick = { vm.ouvrirMoyens("DEPOT") },
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(10.dp))
                     BoutonWallet(
                         texte = tr("Retirer", "Retire"),
                         icone = Icons.AutoMirrored.Filled.CompareArrows,
                         modifier = Modifier.weight(1f),
                         onClick = { vm.ouvrirMoyens("RETRAIT") },
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    BoutonWallet(
+                        texte = tr("Envoyer", "Voye"),
+                        icone = Icons.AutoMirrored.Filled.Send,
+                        modifier = Modifier.weight(1f),
+                        onClick = { montrerEnvoi = true },
                     )
                 }
             }
@@ -1420,6 +1471,21 @@ private fun OngletTransferts(vm: HomeViewModel) {
 
         Spacer(Modifier.height(28.dp))
     }
+    }
+
+    // Flux « Envoyer de l'argent » ouvert par le bouton Envoyer.
+    if (montrerEnvoi) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { montrerEnvoi = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            Box(modifier = Modifier.fillMaxWidth(0.94f)) {
+                SectionEnvoyerArgent(
+                    onTransfertReussi = { vm.chargerPortefeuille() },
+                    onFermer = { montrerEnvoi = false },
+                )
+            }
+        }
     }
 }
 
@@ -1480,16 +1546,25 @@ private fun BoutonWallet(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier.height(48.dp),
+        modifier = modifier.height(58.dp),
         shape = RoundedCornerShape(14.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 6.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.onPrimary,
             contentColor = MaterialTheme.colorScheme.primary,
         ),
     ) {
-        Icon(icone, contentDescription = null, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(texte, fontWeight = FontWeight.Bold)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icone, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.height(3.dp))
+            Text(
+                texte,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
     }
 }
 

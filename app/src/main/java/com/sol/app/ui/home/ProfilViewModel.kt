@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sol.app.data.ChangerMotDePasseRequest
+import com.sol.app.data.MajUsernameRequest
 import com.sol.app.data.ModifierProfilRequest
 import com.sol.app.data.Network
 import com.sol.app.data.Session
@@ -28,6 +29,8 @@ class ProfilViewModel : ViewModel() {
     var photoUrl by mutableStateOf(Session.photoUrl)
         private set
     var nomComplet by mutableStateOf(Session.nomComplet ?: "Membre")
+        private set
+    var username by mutableStateOf(Session.username)
         private set
 
     var dialogueInfosOuvert by mutableStateOf(false)
@@ -54,6 +57,25 @@ class ProfilViewModel : ViewModel() {
     // Medaille de reputation : BRONZE, ARGENT, OR, DIAMANT.
     var medaille by mutableStateOf("BRONZE")
         private set
+
+    // ----- Verification d'identite (KYC) -----
+    // NON_SOUMIS, SOUMIS, APPROUVE ou REJETE (independant du statut du compte).
+    var kycStatut by mutableStateOf("NON_SOUMIS")
+        private set
+
+    /** Charge le statut KYC reel de l'utilisateur (source du badge et du bouton). */
+    fun chargerKyc() {
+        viewModelScope.launch {
+            try {
+                kycStatut = Network.api.kyc().statut
+            } catch (_: Throwable) {
+                // Silencieux : le badge reste « non verifie » si l'appel echoue.
+            }
+        }
+    }
+
+    /** Marque le KYC comme approuve (apres soumission reussie). */
+    fun kycApprouve() { kycStatut = "APPROUVE" }
 
     /**
      * Calcule le score de fiabilite du membre a partir de son historique de
@@ -164,6 +186,17 @@ class ProfilViewModel : ViewModel() {
             Network.api.changerMotDePasse(ChangerMotDePasseRequest(ancien, nouveau))
             dialogueMotDePasseOuvert = false
             message = "Mot de passe modifié avec succès ! 🔒"
+        }
+    }
+
+    /** Modifie le username public (le backend revérifie l'unicité). */
+    fun modifierUsername(nouveau: String, onOk: () -> Unit) {
+        lancer {
+            val u = Network.api.modifierUsername(MajUsernameRequest(nouveau.trim()))
+            Session.username = u.username
+            username = u.username
+            message = "Username mis à jour ! ✓"
+            onOk()
         }
     }
 

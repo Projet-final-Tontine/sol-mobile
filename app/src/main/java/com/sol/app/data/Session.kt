@@ -24,6 +24,13 @@ object Session {
         get() = prefs.getString("utilisateur_id", null)
         set(value) = prefs.edit().putString("utilisateur_id", value).apply()
 
+    /** Identifiant public « @username » de l'utilisateur connecté. */
+    var username: String?
+        get() = prefs.getString("username", null)
+        set(value) = prefs.edit().apply {
+            if (value == null) remove("username") else putString("username", value)
+        }.apply()
+
     var email: String?
         get() = prefs.getString("email", null)
         set(value) = prefs.edit().putString("email", value).apply()

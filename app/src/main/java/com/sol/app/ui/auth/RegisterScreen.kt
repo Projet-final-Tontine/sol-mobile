@@ -63,6 +63,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -96,6 +97,9 @@ fun RegisterScreen(
     var prenom by rememberSaveable { mutableStateOf("") }
     var sexe by rememberSaveable { mutableStateOf("M") }
     var email by rememberSaveable { mutableStateOf("") }
+    var username by rememberSaveable { mutableStateOf("") }
+    var usernameDispo by remember { mutableStateOf<Boolean?>(null) }
+    var usernameMsg by remember { mutableStateOf("") }
     var dateNaissance by rememberSaveable { mutableStateOf("") }
     var isoPays by rememberSaveable { mutableStateOf("HT") }
     var indicatif by rememberSaveable { mutableStateOf("+509") }
@@ -115,7 +119,27 @@ fun RegisterScreen(
     val telephoneValide = telephone.filter { it.isDigit() }.length >= 8
     val formulaireValide = nom.isNotBlank() && prenom.isNotBlank() &&
         emailValide && dateNaissance.isNotBlank() && telephoneValide &&
+        usernameDispo == true &&
         motDePasse.length >= 8 && accepteConditions && acceptePolitique
+
+    // Vérification en temps réel de la disponibilité du username (anti-rebond).
+    LaunchedEffect(username) {
+        val u = username.trim()
+        if (u.length < 4) {
+            usernameDispo = null
+            usernameMsg = ""
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(450)
+        try {
+            val r = com.sol.app.data.Network.api.usernameDisponible(u)
+            usernameDispo = r.disponible
+            usernameMsg = r.message
+        } catch (_: Throwable) {
+            usernameDispo = null
+            usernameMsg = ""
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         // Le meme fond design que la page de connexion.
@@ -323,6 +347,28 @@ fun RegisterScreen(
         )
         Spacer(Modifier.height(8.dp))
 
+        // Username public unique (@...) avec vérification en temps réel.
+        OutlinedTextField(
+            value = username,
+            onValueChange = { username = it.trim() },
+            label = { Text("Nom d'utilisateur (@username)") },
+            leadingIcon = { Text("@", fontSize = 18.sp) },
+            singleLine = true,
+            isError = usernameDispo == false,
+            supportingText = {
+                when (usernameDispo) {
+                    true -> Text("✓ Username disponible", color = Color(0xFF1B8A4E))
+                    false -> Text(usernameMsg.ifBlank { "Ce username est déjà utilisé." },
+                        color = MaterialTheme.colorScheme.error)
+                    null -> Text("4 à 20 caractères, commence par une lettre (lettres, chiffres, _ ou .).")
+                }
+            },
+            shape = RoundedCornerShape(14.dp),
+            colors = couleursChampAuth(),
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+
         // Telephone : indicatif pays + numero
         Text(
             "Numéro de téléphone",
@@ -427,6 +473,7 @@ fun RegisterScreen(
                         sexe = sexe,
                         telephone = indicatif + telephone.filter { it.isDigit() },
                         email = email.trim(),
+                        username = username.trim(),
                         adresse = "",
                         cinNif = "",
                         dateNaissance = dateNaissance,

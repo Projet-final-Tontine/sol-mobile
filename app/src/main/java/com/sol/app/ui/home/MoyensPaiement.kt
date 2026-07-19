@@ -53,9 +53,10 @@ import com.sol.app.data.tr
 // ============================================================================
 //  MOYENS DE PAIEMENT  —  selecteur pour Deposer / Retirer.
 //
-//  Les liens vers MonCash, NatCash et les cartes ne sont pas encore actifs :
-//  ils affichent « bientot disponible ». La « fiche de paie / recu » permet
-//  deja de televerser une preuve de depot bancaire (en attente de confirmation).
+//  MonCash, NatCash, Visa, Mastercard et le virement sont actifs : ils ouvrent
+//  la passerelle de paiement (saisie du montant puis page web de marque). La
+//  « fiche de paie / recu » permet de televerser une preuve de depot bancaire
+//  (en attente de confirmation cote administration).
 //
 //  LOGOS : ce sont des marques deposees, non incluses dans le code. Depose les
 //  fichiers officiels dans res/drawable avec ces noms exacts et ils apparaitront
@@ -103,9 +104,9 @@ private fun moyensRetrait(): List<MoyenPaiement> = listOf(
 )
 
 /**
- * Selecteur de moyen de paiement (Depot ou Retrait). Appelle [onBientot] avec
- * le nom du moyen pour les options pas encore actives, ou [onFiche] pour la
- * fiche de paie.
+ * Selecteur de moyen de paiement (Depot ou Retrait). Appelle [onMoyen] avec le
+ * code du moyen choisi (MONCASH, NATCASH, VISA, MASTERCARD, VIREMENT) pour
+ * lancer la passerelle, ou [onFiche] pour televerser une fiche de paie / recu.
  */
 @Composable
 fun DialogueMoyensPaiement(

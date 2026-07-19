@@ -150,6 +150,10 @@ interface ApiService {
     @GET("api/portefeuille")
     suspend fun portefeuille(): PortefeuilleResponse
 
+    /** Vue consolidée « Mon activité » (indicateurs + projections + courbe). */
+    @GET("api/tableau-de-bord")
+    suspend fun tableauDeBord(): TableauDeBordResponse
+
     @POST("api/portefeuille/depot")
     suspend fun deposer(@Body body: DepotRequest): PortefeuilleResponse
 
@@ -183,6 +187,38 @@ interface ApiService {
         @Path("solId") solId: String,
         @Body body: OuvrirTourRequest,
     ): TourResponse
+
+    // ----- Vérification d'identité (KYC) -----
+
+    /** État courant du KYC (identité pré-remplie + statut). */
+    @GET("api/kyc")
+    suspend fun kyc(): KycEtatResponse
+
+    /** Étape 1 : confirme/corrige l'identité. */
+    @PUT("api/kyc/identite")
+    suspend fun majIdentiteKyc(@Body body: MajIdentiteRequest): KycEtatResponse
+
+    /** Étape finale : soumission des documents. */
+    @POST("api/kyc/soumettre")
+    suspend fun soumettreKyc(@Body body: SoumettreKycRequest): KycEtatResponse
+
+    // ----- Annuaire public (username, recherche, transfert) -----
+
+    /** Disponibilité d'un username (temps réel, public). */
+    @GET("api/users/username-disponible")
+    suspend fun usernameDisponible(@Query("username") username: String): DisponibiliteResponse
+
+    /** Modifie le username de l'utilisateur connecté. */
+    @PUT("api/users/username")
+    suspend fun modifierUsername(@Body body: MajUsernameRequest): UtilisateurResponse
+
+    /** Recherche un bénéficiaire par username ou e-mail (détection auto). */
+    @GET("api/users/search")
+    suspend fun rechercherUtilisateur(@Query("q") q: String): RechercheUtilisateurResponse
+
+    /** Transfert d'argent vers un autre utilisateur. */
+    @POST("api/transferts")
+    suspend fun transferer(@Body body: TransfertRequest): PortefeuilleResponse
 
     @PUT("api/auth/profil")
     suspend fun modifierProfil(@Body body: ModifierProfilRequest): UtilisateurResponse

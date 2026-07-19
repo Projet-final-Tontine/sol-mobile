@@ -25,6 +25,7 @@ import com.sol.app.data.OuvrirTourRequest
 import com.sol.app.data.PaiementResponse
 import com.sol.app.data.PayerCotisationRequest
 import com.sol.app.data.PortefeuilleResponse
+import com.sol.app.data.TableauDeBordResponse
 import com.sol.app.data.RejoindreRequest
 import com.sol.app.data.SolDetailResponse
 import com.sol.app.data.SolResponse
@@ -106,6 +107,25 @@ class HomeViewModel : ViewModel() {
     // ----- Portefeuille (wallet) -----
     var portefeuille by mutableStateOf<PortefeuilleResponse?>(null)
         private set
+
+    // ----- Tableau de bord « Mon activité » (accueil) -----
+    var tableauDeBord by mutableStateOf<TableauDeBordResponse?>(null)
+        private set
+
+    // ----- Vérification d'identité (KYC) : rappel sur l'accueil -----
+    var kycStatut by mutableStateOf("NON_SOUMIS")
+        private set
+
+    /** Charge le statut KYC (pour la bannière de rappel de l'accueil). */
+    fun chargerKyc() {
+        viewModelScope.launch {
+            try {
+                kycStatut = Network.api.kyc().statut
+            } catch (_: Throwable) {
+                // Silencieux.
+            }
+        }
+    }
 
     // Dialogue « bientot disponible » (depot / retrait a venir via Mon Cash).
     var dialogueBientotOuvert by mutableStateOf(false)
@@ -282,6 +302,8 @@ class HomeViewModel : ViewModel() {
         chargerCotisations()
         chargerPortefeuille()
         chargerMesTours()
+        chargerTableauDeBord()
+        chargerKyc()
     }
 
     /** Indicateur du « tirer pour rafraîchir » (pull-to-refresh). */
@@ -299,6 +321,7 @@ class HomeViewModel : ViewModel() {
                         cotisations = Network.api.mesCotisations()
                         portefeuille = Network.api.portefeuille()
                         mesTours = Network.api.mesTours()
+                        tableauDeBord = Network.api.tableauDeBord()
                     }
                     1 -> sols = Network.api.mesSols()
                     2 -> {
@@ -354,6 +377,17 @@ class HomeViewModel : ViewModel() {
                 portefeuille = Network.api.portefeuille()
             } catch (_: Throwable) {
                 // Silencieux : le solde restera a zero si l'appel echoue.
+            }
+        }
+    }
+
+    /** Recupere la vue consolidee « Mon activite » (indicateurs + projections). */
+    fun chargerTableauDeBord() {
+        viewModelScope.launch {
+            try {
+                tableauDeBord = Network.api.tableauDeBord()
+            } catch (_: Throwable) {
+                // Silencieux : les cartes affichent alors des valeurs a zero.
             }
         }
     }

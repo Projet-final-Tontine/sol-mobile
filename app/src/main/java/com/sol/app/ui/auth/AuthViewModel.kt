@@ -35,6 +35,7 @@ class AuthViewModel : ViewModel() {
             Session.telephone = rep.utilisateur.telephone
             Session.statut = rep.utilisateur.statut
             Session.photoUrl = rep.utilisateur.photoUrl
+            Session.username = rep.utilisateur.username
             onSucces()
         }
     }
@@ -54,6 +55,7 @@ class AuthViewModel : ViewModel() {
             Session.telephone = rep.utilisateur.telephone
             Session.statut = rep.utilisateur.statut
             Session.photoUrl = rep.utilisateur.photoUrl
+            Session.username = rep.utilisateur.username
             onSucces()
         }
     }

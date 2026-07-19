@@ -93,8 +93,10 @@ fun ProfilScreen(
     var dialogueThemeOuvert by remember { mutableStateOf(false) }
     var montrerReleve by remember { mutableStateOf(false) }
     var montrerRegistre by remember { mutableStateOf(false) }
+    var montrerKyc by remember { mutableStateOf(false) }
+    var montrerModifUsername by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) { vm.chargerFiabilite() }
+    LaunchedEffect(Unit) { vm.chargerFiabilite(); vm.chargerKyc() }
 
     val contexte = LocalContext.current
     val choisirPhoto = rememberLauncherForActivityResult(
@@ -108,13 +110,15 @@ fun ProfilScreen(
         }
     }
 
-    val statut = (Session.statut ?: "EN_ATTENTE").uppercase()
-    val estVerifie = statut == "ACTIF"
-    val (kycTexte, kycCouleur) = when (statut) {
-        "ACTIF" -> tr("🟢 Vérifié", "🟢 Verifye") to Color(0xFF1B8A4E)
-        "EN_ATTENTE" -> tr("🟡 Vérification en cours", "🟡 Verifikasyon ap fèt") to Color(0xFFB8860B)
+    // Badge KYC basé sur le VRAI statut de vérification d'identité
+    // (indépendant de l'activation du compte).
+    val (kycTexte, kycCouleur) = when (vm.kycStatut) {
+        "APPROUVE" -> tr("🟢 Vérifié", "🟢 Verifye") to Color(0xFF1B8A4E)
+        "SOUMIS" -> tr("🟡 Vérification en cours", "🟡 Verifikasyon ap fèt") to Color(0xFFB8860B)
         else -> tr("🔴 Non vérifié", "🔴 Poko verifye") to MaterialTheme.colorScheme.error
     }
+    // Fond de la carte KYC : teinté selon le statut (alerte si non vérifié).
+    val kycFond = kycCouleur.copy(alpha = 0.12f)
 
     val nomComplet = vm.nomComplet
     val prenom = nomComplet.substringBefore(" ")
@@ -235,6 +239,14 @@ fun ProfilScreen(
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
+                vm.username?.let { u ->
+                    Text(
+                        "@$u",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
                 Text(
                     Session.email ?: "E-mail non renseigné",
                     style = MaterialTheme.typography.bodyMedium,
@@ -263,11 +275,11 @@ fun ProfilScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // 3. Verification d'identite (KYC)
+        // 3. Verification d'identite (KYC) — fond teinté selon le statut.
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            colors = CardDefaults.cardColors(containerColor = kycFond),
             elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         ) {
             Column(modifier = Modifier.padding(18.dp)) {
@@ -291,6 +303,16 @@ fun ProfilScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (vm.kycStatut != "APPROUVE" && vm.kycStatut != "SOUMIS") {
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { montrerKyc = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(tr("Vérifier mon identité", "Verifye idantite mwen"), fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
 
@@ -344,6 +366,43 @@ fun ProfilScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 18.dp),
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // 3d. Mon username (identifiant public)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            tr("Mon username", "Non itilizatè mwen"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            vm.username?.let { "@$it" } ?: tr("Non défini", "Pa defini"),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                    TextButton(onClick = { montrerModifUsername = true }) {
+                        Text(tr("Modifier", "Modifye"), color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+                Text(
+                    tr("Ton identifiant public pour recevoir de l'argent.",
+                        "Idantifyan piblik ou pou resevwa lajan."),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -608,6 +667,63 @@ fun ProfilScreen(
         ) {
             EcranRegistre(onFermer = { montrerRegistre = false })
         }
+    }
+
+    if (montrerKyc) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { montrerKyc = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            EcranKyc(
+                onFermer = { montrerKyc = false },
+                onTermine = {
+                    // La vérification réussie met le badge à « Vérifié ».
+                    vm.kycApprouve()
+                    Session.statut = "ACTIF"
+                },
+            )
+        }
+    }
+
+    if (montrerModifUsername) {
+        var nouveauUsername by remember { mutableStateOf(vm.username ?: "") }
+        AlertDialog(
+            onDismissRequest = { vm.effacerMessages(); montrerModifUsername = false },
+            shape = RoundedCornerShape(20.dp),
+            title = { Text(tr("Modifier mon username", "Modifye non itilizatè"), fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = nouveauUsername,
+                        onValueChange = { nouveauUsername = it.trim() },
+                        label = { Text("@username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        tr("4 à 20 caractères, commence par une lettre.",
+                            "4 a 20 karaktè, kòmanse ak yon lèt."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    vm.erreur?.let {
+                        Text(it, color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !vm.enTraitement && nouveauUsername.length >= 4,
+                    onClick = { vm.modifierUsername(nouveauUsername) { montrerModifUsername = false } },
+                ) { Text(tr("Enregistrer", "Anrejistre")) }
+            },
+            dismissButton = {
+                TextButton(onClick = { vm.effacerMessages(); montrerModifUsername = false }) {
+                    Text(tr("Annuler", "Anile"))
+                }
+            },
+        )
     }
 
     if (confirmerDeconnexion) {
