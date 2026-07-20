@@ -216,9 +216,32 @@ interface ApiService {
     @GET("api/users/search")
     suspend fun rechercherUtilisateur(@Query("q") q: String): RechercheUtilisateurResponse
 
-    /** Transfert d'argent vers un autre utilisateur. */
+    /** Transfert d'argent vers un autre utilisateur (renvoie le reçu numérique). */
     @POST("api/transferts")
-    suspend fun transferer(@Body body: TransfertRequest): PortefeuilleResponse
+    suspend fun transferer(@Body body: TransfertRequest): RecuTransfertResponse
+
+    /** Historique des transferts (envoyés + reçus). */
+    @GET("api/transferts")
+    suspend fun historiqueTransferts(
+        @Query("filtre") filtre: String? = null,
+        @Query("recherche") recherche: String? = null,
+    ): List<TransfertHistoriqueItem>
+
+    /** Détail d'un transfert. */
+    @GET("api/transferts/{id}")
+    suspend fun detailTransfert(@Path("id") id: String): TransfertDetailResponse
+
+    /** Liste des bénéficiaires favoris. */
+    @GET("api/favoris")
+    suspend fun favoris(): List<FavoriResponse>
+
+    /** Ajoute un bénéficiaire aux favoris. */
+    @POST("api/favoris/{beneficiaireId}")
+    suspend fun ajouterFavori(@Path("beneficiaireId") beneficiaireId: String): Map<String, String>
+
+    /** Retire un bénéficiaire des favoris. */
+    @DELETE("api/favoris/{beneficiaireId}")
+    suspend fun supprimerFavori(@Path("beneficiaireId") beneficiaireId: String): Map<String, String>
 
     @PUT("api/auth/profil")
     suspend fun modifierProfil(@Body body: ModifierProfilRequest): UtilisateurResponse

@@ -27,12 +27,80 @@ data class RechercheUtilisateurResponse(
     val nomComplet: String?,
     val photoUrl: String?,
     val kycVerifie: Boolean,
+    val scoreFiabilite: Int? = null,   // 0-100, null si aucun historique
 )
 
+/** Requête de transfert d'argent (v2). */
 data class TransfertRequest(
     val beneficiaire: String,   // username (@...) ou e-mail
     val montant: Double,
-    val note: String?,
+    val devise: String = "HTG",
+    val message: String? = null,
+    val methodeAuth: String? = null,   // "Empreinte digitale", "Reconnaissance faciale", "Mot de passe"
+)
+
+/** Reçu numérique renvoyé après un transfert réussi. */
+data class RecuTransfertResponse(
+    val id: String,
+    val reference: String,          // SOL-yyyyMMdd-XXXXXX
+    val transactionId: String,      // TX-...
+    val statut: String,             // REUSSI, EN_ATTENTE, ECHEC, ANNULE
+    val montant: Double,
+    val devise: String,
+    val frais: Double,
+    val totalDebite: Double,
+    val message: String?,
+    val date: String?,
+    val expediteurNom: String?,
+    val expediteurUsername: String?,
+    val beneficiaireNom: String?,
+    val beneficiaireUsername: String?,
+    val soldeRestant: Double,
+    val urlVerification: String?,
+)
+
+/** Un élément de l'historique des transferts. */
+data class TransfertHistoriqueItem(
+    val id: String,
+    val sens: String,               // ENVOYE ou RECU
+    val autreNom: String?,
+    val autreUsername: String?,
+    val autrePhotoUrl: String?,
+    val montant: Double,
+    val devise: String,
+    val statut: String,
+    val date: String?,
+    val reference: String,
+    val transactionId: String,
+)
+
+/** Détail complet d'un transfert. */
+data class TransfertDetailResponse(
+    val id: String,
+    val sens: String,               // ENVOYE ou RECU
+    val statut: String,
+    val montant: Double,
+    val devise: String,
+    val frais: Double,
+    val expediteurNom: String?,
+    val expediteurUsername: String?,
+    val beneficiaireNom: String?,
+    val beneficiaireUsername: String?,
+    val date: String?,
+    val reference: String,
+    val transactionId: String,
+    val message: String?,
+    val methodeAuth: String?,
+)
+
+/** Un bénéficiaire favori. */
+data class FavoriResponse(
+    val id: String,
+    val beneficiaireId: String,
+    val username: String?,
+    val nomComplet: String?,
+    val photoUrl: String?,
+    val kycVerifie: Boolean,
 )
 
 data class ConnexionRequest(

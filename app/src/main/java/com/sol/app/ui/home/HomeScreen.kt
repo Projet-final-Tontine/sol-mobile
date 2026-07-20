@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.automirrored.filled.Logout
@@ -1346,6 +1347,7 @@ private fun OngletTransferts(vm: HomeViewModel) {
     val aPayer = vm.cotisations.filter { !it.statut.equals("VALIDE", ignoreCase = true) }
     val transactions = vm.portefeuille?.transactions ?: emptyList()
     var montrerEnvoi by remember { mutableStateOf(false) }
+    var montrerHistorique by remember { mutableStateOf(false) }
 
     FondLogin {
     Column(
@@ -1421,6 +1423,33 @@ private fun OngletTransferts(vm: HomeViewModel) {
             }
         }
 
+        Spacer(Modifier.height(12.dp))
+
+        // Accès à l'historique des transferts entre utilisateurs.
+        Card(
+            modifier = Modifier.fillMaxWidth().clickable { montrerHistorique = true },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(12.dp))
+                Text(
+                    tr("Historique des transferts", "Istwa transfè"),
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
         Spacer(Modifier.height(24.dp))
 
         // Cotisations a payer (depuis le solde)
@@ -1473,18 +1502,34 @@ private fun OngletTransferts(vm: HomeViewModel) {
     }
     }
 
-    // Flux « Envoyer de l'argent » ouvert par le bouton Envoyer.
+    // Flux moderne « Envoyer de l'argent » (plein écran) ouvert par le bouton Envoyer.
     if (montrerEnvoi) {
         androidx.compose.ui.window.Dialog(
             onDismissRequest = { montrerEnvoi = false },
-            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false,
+            ),
         ) {
-            Box(modifier = Modifier.fillMaxWidth(0.94f)) {
-                SectionEnvoyerArgent(
-                    onTransfertReussi = { vm.chargerPortefeuille() },
-                    onFermer = { montrerEnvoi = false },
-                )
-            }
+            EcranEnvoyerArgent(
+                onFermer = { montrerEnvoi = false },
+                onTransfertReussi = { vm.chargerPortefeuille() },
+            )
+        }
+    }
+
+    // Historique des transferts (plein écran).
+    if (montrerHistorique) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { montrerHistorique = false },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                dismissOnBackPress = true,
+                dismissOnClickOutside = false,
+            ),
+        ) {
+            HistoriqueTransfertsScreen(onFermer = { montrerHistorique = false })
         }
     }
 }
