@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -117,8 +118,8 @@ fun ProfilScreen(
         "SOUMIS" -> tr("🟡 Vérification en cours", "🟡 Verifikasyon ap fèt") to Color(0xFFB8860B)
         else -> tr("🔴 Non vérifié", "🔴 Poko verifye") to MaterialTheme.colorScheme.error
     }
-    // Fond de la carte KYC : teinté selon le statut (alerte si non vérifié).
-    val kycFond = kycCouleur.copy(alpha = 0.12f)
+    // Fond neutre (cohérent avec le thème) ; le statut est signalé par le texte/icône.
+    val kycFond = MaterialTheme.colorScheme.surface
 
     val nomComplet = vm.nomComplet
     val prenom = nomComplet.substringBefore(" ")
@@ -273,9 +274,12 @@ fun ProfilScreen(
         // 2.5 Profil de confiance (differenciateur)
         CarteFiabilite(vm)
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
-        // 3. Verification d'identite (KYC) — fond teinté selon le statut.
+        // ===== Rubrique : Identité & Confiance =====
+        EnTeteRubrique(tr("Identité & Confiance", "Idantite & Konfyans"))
+
+        // 3. Verification d'identite (KYC) — fond neutre.
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -407,7 +411,10 @@ fun ProfilScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
+
+        // ===== Rubrique : Mon compte =====
+        EnTeteRubrique(tr("Mon compte", "Kont mwen"))
 
         // 4. Informations personnelles
         Card(
@@ -450,7 +457,10 @@ fun ProfilScreen(
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(20.dp))
+
+        // ===== Rubrique : Préférences & Sécurité =====
+        EnTeteRubrique(tr("Préférences & Sécurité", "Preferans & Sekirite"))
 
         // 5b. Langue de l'application
         Card(
@@ -534,7 +544,10 @@ fun ProfilScreen(
             }
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(20.dp))
+
+        // ===== Rubrique : Informations légales =====
+        EnTeteRubrique(tr("Informations légales", "Enfòmasyon legal"))
 
         // 6. Documents legaux
         Card(
@@ -547,13 +560,13 @@ fun ProfilScreen(
                 LigneAction(
                     icone = { Icon(Icons.Default.Description, null, tint = MaterialTheme.colorScheme.primary) },
                     titre = tr("Conditions d'utilisation", "Kondisyon itilizasyon"),
-                    onClick = { documentOuvert = tr("Conditions d'utilisation", "Kondisyon itilizasyon") },
+                    onClick = { documentOuvert = "CONDITIONS" },
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 18.dp))
                 LigneAction(
                     icone = { Icon(Icons.Outlined.PrivacyTip, null, tint = MaterialTheme.colorScheme.primary) },
                     titre = tr("Politique de confidentialité", "Politik konfidansyalite"),
-                    onClick = { documentOuvert = tr("Politique de confidentialité", "Politik konfidansyalite") },
+                    onClick = { documentOuvert = "POLITIQUE" },
                 )
             }
         }
@@ -758,25 +771,172 @@ fun ProfilScreen(
         )
     }
 
-    documentOuvert?.let { titre ->
+    documentOuvert?.let { cle ->
+        val estConditions = cle == "CONDITIONS"
         AlertDialog(
             onDismissRequest = { documentOuvert = null },
             shape = RoundedCornerShape(20.dp),
-            title = { Text(titre, fontWeight = FontWeight.Bold) },
-            text = {
+            title = {
                 Text(
-                    "Le texte officiel des « $titre » de Tontine Numérique sera publié ici " +
-                        "prochainement. En attendant, l'utilisation de l'application vaut " +
-                        "acceptation des règles de fonctionnement du Sol présentées lors de " +
-                        "l'inscription.",
+                    if (estConditions) tr("Conditions d'utilisation", "Kondisyon itilizasyon")
+                    else tr("Politique de confidentialité", "Politik konfidansyalite"),
+                    fontWeight = FontWeight.Bold,
                 )
             },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Text(
+                        if (estConditions) texteConditions() else texteConfidentialite(),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            },
             confirmButton = {
-                TextButton(onClick = { documentOuvert = null }) { Text("Fermer") }
+                TextButton(onClick = { documentOuvert = null }) {
+                    Text(tr("J'ai compris", "Mwen konprann"))
+                }
             },
         )
     }
 }
+
+/** Texte des Conditions d'utilisation de SOL EN LIGNE. */
+private fun texteConditions(): String = tr(
+    """SOL EN LIGNE — Conditions d'utilisation
+Dernière mise à jour : 2026
+
+1. Objet
+SOL EN LIGNE est une plateforme numérique de tontine (« sol ») qui permet à ses membres de créer ou rejoindre des groupes d'épargne rotative, de cotiser et de recevoir la « main » à leur tour.
+
+2. Éligibilité
+Vous devez avoir au moins 18 ans et fournir des informations exactes lors de votre inscription. Chaque personne ne peut détenir qu'un seul compte, identifié par un username public unique.
+
+3. Compte et sécurité
+Vous êtes responsable de la confidentialité de vos identifiants et de toute activité effectuée depuis votre compte. Prévenez-nous immédiatement en cas d'utilisation non autorisée.
+
+4. Fonctionnement du sol
+En rejoignant un sol, vous vous engagez à verser vos cotisations aux échéances convenues. Le non-respect des versements peut entraîner des pénalités, la perte d'accès au groupe et une baisse de votre score de fiabilité.
+
+5. Portefeuille et paiements
+Les dépôts, retraits et transferts transitent par votre portefeuille. Chaque mouvement d'argent est scellé dans un registre inviolable garantissant la traçabilité. Les moyens de paiement présentés fonctionnent en environnement de démonstration.
+
+6. Vérification d'identité (KYC)
+Certaines fonctionnalités peuvent nécessiter la vérification de votre identité. Vous vous engagez à fournir des documents authentiques.
+
+7. Conduite
+Il est interdit d'utiliser la plateforme à des fins frauduleuses, de blanchiment ou de harcèlement d'autres membres.
+
+8. Responsabilité
+SOL EN LIGNE fournit un outil de gestion ; la bonne exécution d'un sol dépend aussi de la bonne foi de ses membres. Le service est fourni « en l'état », sans garantie d'absence d'interruption.
+
+9. Résiliation
+Vous pouvez cesser d'utiliser le service à tout moment. Nous pouvons suspendre un compte en cas de violation des présentes conditions.
+
+10. Droit applicable
+Les présentes conditions sont régies par le droit haïtien. Pour toute question : support@sol-en-ligne.ht.
+
+En utilisant l'application, vous acceptez ces conditions.""",
+
+    """SOL EN LIGNE — Kondisyon itilizasyon
+Dènye mizajou : 2026
+
+1. Objè
+SOL EN LIGNE se yon platfòm nimerik pou sòl ki pèmèt manm yo kreye oswa antre nan gwoup epay, kotize epi resevwa men yo lè tou yo rive.
+
+2. Kondisyon pou patisipe
+Ou dwe gen omwen 18 an epi bay bon jan enfòmasyon lè w ap enskri. Chak moun ka gen yon sèl kont, ak yon sèl non itilizatè piblik.
+
+3. Kont ak sekirite
+Se ou ki responsab idantifyan ou yo ak tout aktivite sou kont ou. Avèti nou touswit si gen yon itilizasyon ou pa otorize.
+
+4. Fonksyònman sòl la
+Lè w antre nan yon sòl, ou dakò pou peye kotizasyon ou yo alè. Si w pa peye, sa ka lakòz penalite, pèt aksè nan gwoup la ak yon bès nan nòt fyabilite ou.
+
+5. Pòtfèy ak peman
+Depo, retrè ak transfè pase nan pòtfèy ou. Chak deplasman lajan sele nan yon rejis enfalsifyab. Mwayen peman yo la nan yon anviwònman demonstrasyon.
+
+6. Verifikasyon idantite (KYC)
+Kèk fonksyonalite ka mande verifye idantite ou. Ou dwe bay dokiman ki otantik.
+
+7. Konduit
+Entèdi pou itilize platfòm nan pou zafè fwod, blanchisman lajan oswa pou anmède lòt manm.
+
+8. Responsablite
+SOL EN LIGNE bay yon zouti jesyon ; bon mach yon sòl depann tou de bòn fwa manm yo. Sèvis la bay « jan li ye a ».
+
+9. Rezilyasyon
+Ou ka sispann itilize sèvis la nenpòt kilè. Nou ka sispann yon kont si li vyole kondisyon sa yo.
+
+10. Lwa ki aplike
+Kondisyon sa yo swiv lwa Ayiti. Pou nenpòt kesyon : support@sol-en-ligne.ht.
+
+Lè w ap itilize aplikasyon an, ou aksepte kondisyon sa yo.""",
+)
+
+/** Texte de la Politique de confidentialité de SOL EN LIGNE. */
+private fun texteConfidentialite(): String = tr(
+    """SOL EN LIGNE — Politique de confidentialité
+Dernière mise à jour : 2026
+
+1. Données que nous collectons
+Nous collectons les informations que vous fournissez : nom, prénom, date de naissance, adresse, e-mail, téléphone, username, photo de profil et, le cas échéant, les documents d'identité pour la vérification (KYC). Nous enregistrons aussi vos opérations financières au sein de l'application.
+
+2. Utilisation des données
+Vos données servent à : créer et sécuriser votre compte, faire fonctionner les sols et le portefeuille, vous identifier auprès des autres membres via votre username, calculer votre score de fiabilité et prévenir la fraude.
+
+3. Confidentialité de l'e-mail et du téléphone
+Votre username est public ; en revanche, votre e-mail et votre téléphone restent privés et ne sont pas affichés aux autres membres.
+
+4. Partage
+Nous ne vendons pas vos données. Elles ne sont pas transmises à des tiers à des fins commerciales. Les membres d'un même sol voient uniquement les informations nécessaires au fonctionnement du groupe.
+
+5. Sécurité
+Les mots de passe sont chiffrés. Les mouvements d'argent sont scellés dans un registre inviolable à empreinte cryptographique. Nous appliquons des mesures raisonnables pour protéger vos données.
+
+6. Conservation
+Nous conservons vos données tant que votre compte est actif. Un compte inactif depuis longtemps peut être supprimé ou anonymisé, dans le respect des obligations comptables.
+
+7. Vos droits
+Vous pouvez consulter et corriger vos informations dans votre profil, et demander la suppression de votre compte, sous réserve des règles applicables aux sols en cours.
+
+8. Contact
+Pour toute question relative à vos données : confidentialite@sol-en-ligne.ht.
+
+En utilisant l'application, vous acceptez cette politique.""",
+
+    """SOL EN LIGNE — Politik konfidansyalite
+Dènye mizajou : 2026
+
+1. Done nou kolekte
+Nou kolekte enfòmasyon ou bay : non, siyati, dat nesans, adrès, imèl, telefòn, non itilizatè, foto pwofil ak, si sa nesesè, dokiman idantite pou verifikasyon (KYC). Nou anrejistre tou operasyon lajan ou yo nan aplikasyon an.
+
+2. Kijan nou itilize done yo
+Done ou yo sèvi pou : kreye ak sekirize kont ou, fè sòl yo ak pòtfèy la mache, idantifye ou ak lòt manm atravè non itilizatè ou, kalkile nòt fyabilite ou epi anpeche fwod.
+
+3. Konfidansyalite imèl ak telefòn
+Non itilizatè ou piblik ; men imèl ak telefòn ou rete prive, yo pa parèt bay lòt manm.
+
+4. Pataj
+Nou pa vann done ou. Nou pa bay yo bay lòt konpayi pou zafè komès. Manm menm sòl la wè sèlman enfòmasyon ki nesesè pou gwoup la mache.
+
+5. Sekirite
+Modpas yo chifre. Deplasman lajan yo sele nan yon rejis enfalsifyab ak anprent kriptografik. Nou pran mezi rezonab pou pwoteje done ou.
+
+6. Konsèvasyon
+Nou kenbe done ou toutotan kont ou aktif. Yon kont ki inaktif depi lontan ka efase oswa anonimize.
+
+7. Dwa ou
+Ou ka gade epi korije enfòmasyon ou nan pwofil ou, epi mande efase kont ou, selon règ ki aplike pou sòl k ap fèt yo.
+
+8. Kontak
+Pou nenpòt kesyon sou done ou : confidentialite@sol-en-ligne.ht.
+
+Lè w ap itilize aplikasyon an, ou aksepte politik sa a.""",
+)
 
 /**
  * Carte « Profil de confiance » : le differenciateur de l'application.
@@ -1161,6 +1321,18 @@ private fun LigneInfo(label: String, valeur: String) {
             fontWeight = FontWeight.SemiBold,
         )
     }
+}
+
+/** Titre de rubrique (regroupe visuellement les cartes du profil). */
+@Composable
+private fun EnTeteRubrique(titre: String) {
+    Text(
+        titre.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = 6.dp, bottom = 10.dp),
+    )
 }
 
 @Composable

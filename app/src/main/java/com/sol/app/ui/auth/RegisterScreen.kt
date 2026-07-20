@@ -475,7 +475,6 @@ fun RegisterScreen(
                         email = email.trim(),
                         username = username.trim(),
                         adresse = "",
-                        cinNif = "",
                         dateNaissance = dateNaissance,
                         motDePasse = motDePasse,
                     ),

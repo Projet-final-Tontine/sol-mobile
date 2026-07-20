@@ -10,7 +10,6 @@ data class InscriptionRequest(
     val email: String,
     val username: String,
     val adresse: String,
-    val cinNif: String,
     val dateNaissance: String, // format AAAA-MM-JJ
     val motDePasse: String,
     val role: String = "MEMBRE",
