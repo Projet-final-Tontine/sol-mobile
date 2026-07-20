@@ -218,7 +218,7 @@ fun EcranEnvoyerArgent(onFermer: () -> Unit, onTransfertReussi: () -> Unit) {
                             enEnvoi = enEnvoi,
                             erreur = erreur,
                             onConfirmer = {
-                                val activity = context as? FragmentActivity
+                                val activity = context.activiteFragment()
                                 if (activity != null) {
                                     demanderAuthTransfert(
                                         activity,
@@ -820,6 +820,20 @@ private fun LigneRecu(label: String, valeur: String) {
 
 // ============================== Utilitaires ==============================
 
+/**
+ * Retrouve la [FragmentActivity] hôte en remontant la chaîne des ContextWrapper.
+ * Nécessaire car, à l'intérieur d'une fenêtre Dialog, LocalContext n'est pas
+ * directement l'activité (BiometricPrompt en a pourtant besoin).
+ */
+internal fun Context.activiteFragment(): FragmentActivity? {
+    var courant: Context? = this
+    while (courant is android.content.ContextWrapper) {
+        if (courant is FragmentActivity) return courant
+        courant = courant.baseContext
+    }
+    return null
+}
+
 /** Couleur d'un score de fiabilité (0-100). */
 internal fun couleurScore(score: Int): Color = when {
     score >= 80 -> VERT
@@ -850,6 +864,7 @@ internal fun couleurStatut(statut: String): Color = when (statut.uppercase()) {
  * méthode réellement utilisée pour l'enregistrer dans le reçu.
  */
 private fun demanderAuthTransfert(activity: FragmentActivity, onSucces: (String) -> Unit) {
+    val gestionnaire = BiometricManager.from(activity)
     val autorises =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             BiometricManager.Authenticators.BIOMETRIC_WEAK or
@@ -859,23 +874,26 @@ private fun demanderAuthTransfert(activity: FragmentActivity, onSucces: (String)
         }
 
     // Aucun moyen sécurisé configuré : on n'empêche pas la démo.
-    if (BiometricManager.from(activity).canAuthenticate(autorises) != BiometricManager.BIOMETRIC_SUCCESS) {
+    if (gestionnaire.canAuthenticate(autorises) != BiometricManager.BIOMETRIC_SUCCESS) {
         onSucces(tr("Mot de passe", "Modpas"))
         return
     }
+
+    // Méthode probable : si une biométrie est enrôlée on la privilégie,
+    // sinon c'est le code (mot de passe) du téléphone. Déterminé à l'avance
+    // pour rester compatible avec toutes les versions d'androidx.biometric.
+    val biometrieDisponible = gestionnaire.canAuthenticate(
+        BiometricManager.Authenticators.BIOMETRIC_WEAK
+    ) == BiometricManager.BIOMETRIC_SUCCESS
+    val methodePrevue =
+        if (biometrieDisponible) methodeBiometrique(activity) else tr("Mot de passe", "Modpas")
 
     val prompt = BiometricPrompt(
         activity,
         ContextCompat.getMainExecutor(activity),
         object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                val methode =
-                    if (result.authenticationType == BiometricPrompt.AUTHENTICATION_TYPE_DEVICE_CREDENTIAL) {
-                        tr("Mot de passe", "Modpas")
-                    } else {
-                        methodeBiometrique(activity)
-                    }
-                onSucces(methode)
+                onSucces(methodePrevue)
             }
         },
     )
@@ -905,6 +923,21 @@ private fun methodeBiometrique(context: Context): String {
     }
 }
 
+/** URL publique de vérification d'un reçu à partir de sa référence. */
+internal fun urlVerificationTransfert(reference: String): String =
+    Network.BASE_URL.trimEnd('/') + "/api/transferts/verifier/" + reference
+
+/** Reconstruit un reçu à partir du détail (pour régénérer le PDF depuis l'historique). */
+internal fun com.sol.app.data.TransfertDetailResponse.versRecu(): RecuTransfertResponse =
+    RecuTransfertResponse(
+        id = id, reference = reference, transactionId = transactionId, statut = statut,
+        montant = montant, devise = devise, frais = frais, totalDebite = montant + frais,
+        message = message, date = date,
+        expediteurNom = expediteurNom, expediteurUsername = expediteurUsername,
+        beneficiaireNom = beneficiaireNom, beneficiaireUsername = beneficiaireUsername,
+        soldeRestant = 0.0, urlVerification = urlVerificationTransfert(reference),
+    )
+
 /** Génère un QR code hors ligne (ZXing). */
 internal fun genererQrCode(texte: String, taille: Int): Bitmap {
     val matrice = QRCodeWriter().encode(texte, BarcodeFormat.QR_CODE, taille, taille)
@@ -924,7 +957,7 @@ internal fun genererQrCode(texte: String, taille: Int): Bitmap {
  * Construit le reçu PDF et l'enregistre dans Téléchargements (MediaStore,
  * Android 10+). Renvoie l'URI du fichier, ou null si non supporté.
  */
-private fun enregistrerPdfRecu(context: Context, r: RecuTransfertResponse, qr: Bitmap): Uri? {
+internal fun enregistrerPdfRecu(context: Context, r: RecuTransfertResponse, qr: Bitmap): Uri? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
 
     val largeur = 595
@@ -1005,7 +1038,7 @@ private fun enregistrerPdfRecu(context: Context, r: RecuTransfertResponse, qr: B
 }
 
 /** Ouvre le sélecteur de partage pour un PDF (URI MediaStore). */
-private fun partagerFichier(context: Context, uri: Uri) {
+internal fun partagerFichier(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "application/pdf"
         putExtra(Intent.EXTRA_STREAM, uri)
@@ -1018,7 +1051,7 @@ private fun partagerFichier(context: Context, uri: Uri) {
 }
 
 /** Ouvre le PDF dans une application de lecture. */
-private fun ouvrirFichier(context: Context, uri: Uri) {
+internal fun ouvrirFichier(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_VIEW).apply {
         setDataAndType(uri, "application/pdf")
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)

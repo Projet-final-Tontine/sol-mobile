@@ -26,7 +26,9 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +38,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -332,6 +336,64 @@ fun DetailTransfertScreen(transfertId: String, onFermer: () -> Unit) {
                                 }
                             }
                         }
+
+                        // Reçu toujours récupérable : QR de vérification + PDF/partage.
+                        Spacer(Modifier.height(20.dp))
+                        val context = LocalContext.current
+                        val qr = remember(d.reference) {
+                            genererQrCode(urlVerificationTransfert(d.reference), 320)
+                        }
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(tr("Reçu numérique", "Resi nimerik"),
+                                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                Spacer(Modifier.height(12.dp))
+                                androidx.compose.foundation.Image(
+                                    bitmap = qr.asImageBitmap(),
+                                    contentDescription = tr("QR de vérification", "QR verifikasyon"),
+                                    modifier = Modifier.size(150.dp),
+                                )
+                                Spacer(Modifier.height(14.dp))
+                                Row(modifier = Modifier.fillMaxWidth()) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            val uri = enregistrerPdfRecu(context, d.versRecu(), qr)
+                                            if (uri != null) partagerFichier(context, uri)
+                                        },
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = null,
+                                            modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(tr("Partager", "Pataje"))
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                    OutlinedButton(
+                                        onClick = {
+                                            val uri = enregistrerPdfRecu(context, d.versRecu(), qr)
+                                            if (uri != null) ouvrirFichier(context, uri)
+                                        },
+                                        shape = RoundedCornerShape(12.dp),
+                                        modifier = Modifier.weight(1f),
+                                    ) {
+                                        Icon(Icons.Default.PictureAsPdf, contentDescription = null,
+                                            modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("PDF")
+                                    }
+                                }
+                            }
+                        }
+
                         Spacer(Modifier.height(24.dp))
                     }
                 }
