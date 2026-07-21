@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -1348,6 +1349,8 @@ private fun OngletTransferts(vm: HomeViewModel) {
     val transactions = vm.portefeuille?.transactions ?: emptyList()
     var montrerEnvoi by remember { mutableStateOf(false) }
     var montrerHistorique by remember { mutableStateOf(false) }
+    // Règle stricte : pas de dépôt / retrait / transfert tant que le KYC n'est pas approuvé.
+    val identiteVerifiee = vm.kycStatut == "APPROUVE"
 
     FondLogin {
     Column(
@@ -1403,6 +1406,7 @@ private fun OngletTransferts(vm: HomeViewModel) {
                         texte = tr("Déposer", "Depoze"),
                         icone = Icons.Default.Add,
                         modifier = Modifier.weight(1f),
+                        enabled = identiteVerifiee,
                         onClick = { vm.ouvrirMoyens("DEPOT") },
                     )
                     Spacer(Modifier.width(10.dp))
@@ -1410,6 +1414,7 @@ private fun OngletTransferts(vm: HomeViewModel) {
                         texte = tr("Retirer", "Retire"),
                         icone = Icons.AutoMirrored.Filled.CompareArrows,
                         modifier = Modifier.weight(1f),
+                        enabled = identiteVerifiee,
                         onClick = { vm.ouvrirMoyens("RETRAIT") },
                     )
                     Spacer(Modifier.width(10.dp))
@@ -1417,7 +1422,36 @@ private fun OngletTransferts(vm: HomeViewModel) {
                         texte = tr("Envoyer", "Voye"),
                         icone = Icons.AutoMirrored.Filled.Send,
                         modifier = Modifier.weight(1f),
+                        enabled = identiteVerifiee,
                         onClick = { montrerEnvoi = true },
+                    )
+                }
+            }
+        }
+
+        // Barrière KYC : message clair tant que l'identité n'est pas vérifiée.
+        if (!identiteVerifiee) {
+            Spacer(Modifier.height(12.dp))
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF4E5)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFFB26A00))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        tr(
+                            "Vérifiez votre identité pour déposer, retirer ou envoyer de l'argent.",
+                            "Verifye idantite w pou depoze, retire oswa voye lajan.",
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF7A4A00),
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -1587,10 +1621,12 @@ private fun BoutonWallet(
     texte: String,
     icone: androidx.compose.ui.graphics.vector.ImageVector,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     Button(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.height(58.dp),
         shape = RoundedCornerShape(14.dp),
         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 6.dp),
